@@ -1,0 +1,14 @@
+version: '3'
+services:
+  database:
+    image: postgres:16.0-alpine3.18
+    environment:
+      - POSTGRES_DB=local_db
+      - POSTGRES_USER=local_user
+      - POSTGRES_PASSWORD=local_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data_local:/var/lib/postgresql/data/
+volumes:
+  pg_data_local:

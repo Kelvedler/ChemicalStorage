@@ -1,0 +1,11 @@
+{{template "base" .}}
+{{define "title"}}Реагенти{{end}}
+{{define "sticky-top"}}
+  {{template "reagents-bar" .}}
+{{end}}
+{{define "content"}}
+  <div class="flex justify-center">
+    {{template "reagents-search" .}}
+  </div>
+{{end}}
+

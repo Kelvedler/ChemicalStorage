@@ -1,0 +1,46 @@
+{{block "reagents-search" .}}
+  <div id="search-results" class="w-1/2">
+    {{range .ReagentsSlice}}
+      <button onClick="window.location.href='/reagents/{{.ID}}';" class="flex bg-yellow mt-2 rounded-md shadow-lg shadow-gray w-full">
+        <ul class="list-none">
+          <div class="pl-8 pr-8 pt-3 text-left">{{.Name}}</div>
+          <div class="pl-8 pr-8 pb-3 text-left">{{.Formula}}</div>
+        </ul>
+      </button>
+    {{end}}
+  </div>
+{{end}}
+
+{{block "reagents-bar" .}}
+  <div class="flex justify-between bg-gray-light">
+    <div class="flex w-1/6">
+      <button onClick="window.location.href='/reagent-new';" class="bg-gray-light hover:bg-gray hover:text-white text-xl font-serif font-bold w-full py-4 rounded">
+        Створити
+      </button>
+    </div>
+  <input type="search" name="src" placeholder="назва реагенту чи формула" maxlength="50" class="flex w-1/3 rounded-full px-6 my-2 border-2 border-gray-dark" hx-get="/api/v1/reagents/" hx-trigger="keyup changed delay:400ms" hx-target="#search-results" hx-swap="outerHTML"/>
+    <div class="w-1/6"></div>
+  </div>
+{{end}}
+
+{{block "create-form" .}}
+  <div id="create-form" class="flex justify-center">
+    <form class="flex justify-left w-1/2 bg-gray-light p-8 mt-8 rounded-lg">
+      <ul class="list-none w-full">
+        <div class="flex mb-4 w-full">
+          <div class="w-1/5 text-center text-xl font-serif">Назва</div>
+        <textarea name="name" maxlength="300" rows="3" style="resize:none" class="w-4/5 rounded-md">{{or .Name ""}}</textarea>
+        </div>
+        <div>{{.NameErr}}</div>
+        <div class="flex mb-4 w-full">
+          <div class="w-1/5 text-center text-xl font-serif">Формула</div>
+        <input type="text" name="formula" value='{{or .Formula ""}}' maxlength="55" class="w-4/5 rounded-md"/>
+        </div>
+        <div>{{.FormulaErr}}</div>
+        <div class="flex justify-center w-full">
+          <button hx-post="/api/v1/reagents" hx-ext="json-enc" hx-target="#create-form" hx-swap="outerHTML" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold w-1/3 py-4 rounded-md">Створити</button>
+        </div>
+      </ul>
+    </form>
+  </div>
+{{end}}
