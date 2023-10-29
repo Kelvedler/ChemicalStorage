@@ -8,19 +8,23 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/julienschmidt/httprouter"
+	"github.com/microcosm-cc/bluemonday"
 )
 
 type BaseHandler struct {
 	dbpool   *pgxpool.Pool
+	sanitize *bluemonday.Policy
 	validate *validator.Validate
 }
 
 func newBaseHandler(
 	dbpool *pgxpool.Pool,
+	sanitize *bluemonday.Policy,
 	validate *validator.Validate,
 ) *BaseHandler {
 	return &BaseHandler{
 		dbpool:   dbpool,
+		sanitize: sanitize,
 		validate: validate,
 	}
 }
@@ -36,10 +40,11 @@ func staticFilepath() string {
 
 func BaseRouter(
 	dbpool *pgxpool.Pool,
+	sanitize *bluemonday.Policy,
 	validate *validator.Validate,
 ) *httprouter.Router {
 	router := httprouter.New()
-	handler := newBaseHandler(dbpool, validate)
+	handler := newBaseHandler(dbpool, sanitize, validate)
 	router.GET("/favicon.ico", handler.Favicon)
 	router.ServeFiles("/static/*filepath", http.Dir(staticFilepath()))
 	router.GET("/", handler.Index)

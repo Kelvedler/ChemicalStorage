@@ -16,7 +16,8 @@ func main() {
 	ctx := context.Background()
 	common.LoadDotenv()
 	validate := validator.New(validator.WithRequiredStructEnabled())
+	sanitize := common.GetSanitizer()
 	dbpool := db.GetConnectionPool(ctx)
-	router := view.BaseRouter(dbpool, validate)
+	router := view.BaseRouter(dbpool, sanitize, validate)
 	log.Fatal(http.ListenAndServe(":8000", router))
 }

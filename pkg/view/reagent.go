@@ -96,6 +96,12 @@ func (handler *BaseHandler) ReagentsAPI(
 	tmpl.Execute(w, data)
 }
 
+func sanitizeReagentShort(handler *BaseHandler, reagent *db.ReagentShort) {
+	sanitizer := handler.sanitize
+	reagent.Name = sanitizer.Sanitize(reagent.Name)
+	reagent.Formula = sanitizer.Sanitize(reagent.Formula)
+}
+
 func (handler *BaseHandler) ReagentCreateAPI(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -107,6 +113,9 @@ func (handler *BaseHandler) ReagentCreateAPI(
 		common.DefaultErrorResp(w)
 		return
 	}
+
+	sanitizeReagentShort(handler, &reagent)
+
 	err = common.ValidateStruct(handler.validate, reagent)
 	if err != nil {
 		tmpl := template.Must(template.ParseFiles("templates/reagents-assets.html")).
