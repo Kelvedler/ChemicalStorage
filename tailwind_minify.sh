@@ -1,1 +1,1 @@
-./tailwindcss -i input.css -o static/style.css --minify
+./tailwindcss -i input.css -o static/output.css --minify

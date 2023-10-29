@@ -1,1 +1,1 @@
-./tailwindcss -i input.css -o static/style.css --watch
+./tailwindcss -i input.css -o static/output.css --watch
