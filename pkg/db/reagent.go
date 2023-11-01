@@ -81,7 +81,7 @@ func ReagentGetRange(
 	src string,
 ) ([]ReagentFull, error) {
 	orderBy := "-created_at"
-	if len(src) >= 3 {
+	if len(src) >= 1 {
 		query := "SELECT * from reagent WHERE name ILIKE $4 OR formula ILIKE $4 ORDER BY $1 LIMIT $2 OFFSET $3"
 		return reagentGetSlice(ctx, dbpool, query, orderBy, limit, offset, src+"%")
 	} else {

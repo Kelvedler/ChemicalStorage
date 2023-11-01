@@ -3,6 +3,7 @@ package view
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"text/template"
 
 	"github.com/go-playground/validator/v10"
@@ -14,6 +15,21 @@ import (
 
 type reagentsData struct {
 	ReagentsSlice []db.ReagentFull
+	LastReagent   db.ReagentFull
+	NextOffset    int
+	Src           string
+}
+
+func newReagentsData(reagentsSlice []db.ReagentFull, src string, offset int) (data reagentsData) {
+	if len(reagentsSlice) > 1 {
+		data.ReagentsSlice = reagentsSlice[:len(reagentsSlice)-1]
+		data.LastReagent = reagentsSlice[len(reagentsSlice)-1]
+		data.NextOffset = offset + len(reagentsSlice)
+		data.Src = src
+	} else {
+		data.ReagentsSlice = reagentsSlice
+	}
+	return data
 }
 
 type reagentData struct {
@@ -26,15 +42,15 @@ func (handlerContext *HandlerContext) Reagents(
 	r *http.Request,
 	_ httprouter.Params,
 ) {
-	reagentsSlice, err := db.ReagentGetRange(r.Context(), handlerContext.dbpool, 20, 0, "")
+	offset := 0
+	src := ""
+	reagentsSlice, err := db.ReagentGetRange(r.Context(), handlerContext.dbpool, 20, offset, src)
 	if err != nil {
 		rc.logger.Error(err.Error())
 		common.DefaultErrorResp(w)
 		return
 	}
-	data := reagentsData{
-		ReagentsSlice: reagentsSlice,
-	}
+	data := newReagentsData(reagentsSlice, src, offset)
 	tmpl := template.Must(
 		template.ParseFiles(
 			"templates/reagents.html",
@@ -87,35 +103,58 @@ func (handlerContext *HandlerContext) ReagentCreate(
 	tmpl.Execute(w, nil)
 }
 
+type ReagentsAPIForm struct {
+	Src    string `json:"src"    validate:"omitempty,lte=50"          uaLocal:"пошук"`
+	Offset int    `json:"offset" validate:"omitempty,min=0,max=10000" uaLocal:"зміщення"`
+}
+
 func (handlerContext *HandlerContext) ReagentsAPI(
 	rc RequestContext,
 	w http.ResponseWriter,
 	r *http.Request,
 	_ httprouter.Params,
 ) {
-	tmpl := template.Must(
-		template.ParseFiles(
-			"templates/reagents-assets.html",
-		),
-	).Lookup("reagents-search")
+	src := r.URL.Query().Get("src")
+	offsetStr := r.URL.Query().Get("offset")
+	if offsetStr == "" {
+		offsetStr = "0"
+	}
+	offset, err := strconv.Atoi(offsetStr)
+	if err != nil {
+		rc.logger.Info(err.Error())
+		return
+	}
 
-	srcForm := common.SrcForm{Src: r.URL.Query().Get("src")}
-	err := handlerContext.validate.Struct(srcForm)
+	srcForm := ReagentsAPIForm{Src: src, Offset: offset}
+	err = handlerContext.validate.Struct(srcForm)
 	if err != nil {
 		err = common.LocalizeValidationErrors(err.(validator.ValidationErrors), srcForm)
 		rc.logger.Info(err.Error())
-		tmpl.Execute(w, nil)
+		w.WriteHeader(400)
 		return
 	}
-	reagentsSlice, err := db.ReagentGetRange(r.Context(), handlerContext.dbpool, 20, 0, srcForm.Src)
+	reagentsSlice, err := db.ReagentGetRange(
+		r.Context(),
+		handlerContext.dbpool,
+		20,
+		offset,
+		srcForm.Src,
+	)
 	if err != nil {
 		rc.logger.Error(err.Error())
-		tmpl.Execute(w, nil)
+		w.WriteHeader(400)
 		return
 	}
-	data := reagentsData{
-		ReagentsSlice: reagentsSlice,
+	if len(reagentsSlice) == 0 {
+		return
 	}
+	data := newReagentsData(reagentsSlice, src, offset)
+	tmpl := template.Must(
+		template.ParseFiles(
+			"templates/reagents.html",
+			"templates/reagents-assets.html",
+		),
+	).Lookup("reagents-search")
 	tmpl.Execute(w, data)
 }
 

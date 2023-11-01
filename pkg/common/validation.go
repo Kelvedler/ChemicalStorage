@@ -7,10 +7,6 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-type SrcForm struct {
-	Src string `json:"src" validate:"omitempty,gte=3,lte=50" uaLocal:"пошук"`
-}
-
 type ValidationError struct {
 	asMapLocal map[string]string
 	asString   string
