@@ -2,8 +2,9 @@ package main
 
 import (
 	"context"
-	"log"
+	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/go-playground/validator/v10"
 
@@ -14,10 +15,12 @@ import (
 
 func main() {
 	ctx := context.Background()
-	common.LoadDotenv()
+	mainLogger := common.MainLogger()
+	common.LoadDotenv(mainLogger)
 	validate := validator.New(validator.WithRequiredStructEnabled())
 	sanitize := common.GetSanitizer()
-	dbpool := db.GetConnectionPool(ctx)
-	router := view.BaseRouter(dbpool, sanitize, validate)
-	log.Fatal(http.ListenAndServe(":8000", router))
+	dbpool := db.GetConnectionPool(ctx, mainLogger)
+	router := view.BaseRouter(dbpool, sanitize, validate, mainLogger)
+	err := http.ListenAndServe(fmt.Sprintf(":%s", os.Getenv("PORT")), router)
+	mainLogger.Error(err.Error())
 }

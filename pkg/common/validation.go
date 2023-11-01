@@ -8,12 +8,12 @@ import (
 )
 
 type SrcForm struct {
-	Src string `json:"src" validate:"gte=3,lte=50"`
+	Src string `json:"src" validate:"omitempty,gte=3,lte=50" uaLocal:"пошук"`
 }
 
 type ValidationError struct {
-	asMap    map[string]string
-	asString string
+	asMapLocal map[string]string
+	asString   string
 }
 
 func (err ValidationError) Error() string {
@@ -21,41 +21,47 @@ func (err ValidationError) Error() string {
 }
 
 func (err ValidationError) Map() map[string]string {
-	return err.asMap
+	return err.asMapLocal
 }
 
-func ValidateStruct(validate *validator.Validate, i interface{}) error {
-	err := validate.Struct(i)
-	if err == nil {
-		return nil
-	}
+func LocalizeValidationErrors(errs validator.ValidationErrors, targetStruct interface{}) error {
 	var validationErr ValidationError
-	validationErr.asMap = make(map[string]string)
-	for _, e := range err.(validator.ValidationErrors) {
-		field := e.StructField()
-		errParam := e.Param()
-		fieldLen := len(fmt.Sprintf("%v", e.Value()))
-		reflection := reflect.TypeOf(i)
+	validationErr.asMapLocal = make(map[string]string)
+	for _, err := range errs {
+		field := err.StructField()
+		errParam := err.Param()
+		fieldLen := len(fmt.Sprintf("%v", err.Value()))
+		reflection := reflect.TypeOf(targetStruct)
 		reflectedField, _ := reflection.FieldByName(field)
-		errString := fmt.Sprintf("Поле %s", reflectedField.Tag.Get("uaLocal"))
-		switch e.Tag() {
+		errString := fmt.Sprintf("Field %s", field)
+		errStringLocal := fmt.Sprintf("Поле %s", reflectedField.Tag.Get("uaLocal"))
+		switch err.Tag() {
 		case "gte":
 			if fieldLen == 0 {
-				errString = fmt.Sprintf("%s обов'язкове", errString)
+				errString = fmt.Sprintf("%s is required", errString)
+				errStringLocal = fmt.Sprintf("%s обов'язкове", errStringLocal)
 			} else {
-				errString = fmt.Sprintf("%s надто коротке (%d), мінімальна довжина - %s символи(ів)", errString, fieldLen, errParam)
+				errString = fmt.Sprintf("%s is too short (%d), min length - %s", errString, fieldLen, errParam)
+				errStringLocal = fmt.Sprintf("%s надто коротке (%d), мінімальна довжина - %s символи(ів)", errStringLocal, fieldLen, errParam)
 			}
 		case "lte":
 			errString = fmt.Sprintf(
-				"%s надто довге (%d), максимальна довжина - %s символи(ів)",
+				"%s too long (%d), max length - %s",
 				errString,
 				fieldLen,
 				errParam,
 			)
+			errStringLocal = fmt.Sprintf(
+				"%s надто довге (%d), максимальна довжина - %s символи(ів)",
+				errStringLocal,
+				fieldLen,
+				errParam,
+			)
 		default:
-			errString = errString + " невірне"
+			errString = errString + " invalid"
+			errStringLocal = errStringLocal + " невірне"
 		}
-		validationErr.asMap[field+"Err"] = errString
+		validationErr.asMapLocal[field+"Err"] = errStringLocal
 		if validationErr.asString != "" {
 			validationErr.asString = validationErr.asString + "\n" + errString
 		} else {

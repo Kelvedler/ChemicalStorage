@@ -7,7 +7,8 @@ import (
 	"github.com/julienschmidt/httprouter"
 )
 
-func (handler *BaseHandler) Index(
+func (handlerContext *HandlerContext) Index(
+	rc RequestContext,
 	w http.ResponseWriter,
 	r *http.Request,
 	_ httprouter.Params,

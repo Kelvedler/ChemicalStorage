@@ -6,7 +6,8 @@ import (
 	"github.com/julienschmidt/httprouter"
 )
 
-func (handler *BaseHandler) Favicon(
+func (handlerContext *HandlerContext) Favicon(
+	rc RequestContext,
 	w http.ResponseWriter,
 	r *http.Request,
 	_ httprouter.Params,

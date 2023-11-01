@@ -17,30 +17,30 @@
 {{end}}
 
 {{block "base" .}}
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <title>{{block "title" .}}{{end}}</title>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link href="/static/output.css" rel="stylesheet">
-    <link href="/static/style.css" rel="stylesheet">
-    <script src="/static/htmx.min.js"></script>
-    <script src="/static/json-enc.js"></script>
-    <script src="/static/subscript-numbers.js"></script>
-  </head>
-  <body class="bg-blue-light">
-    <div class="relative">
-      <div class="sticky top-0 left-0 right-0">
-        {{template "navbar" .}}
-        {{block "sticky-top" .}}{{end}}
+  <!DOCTYPE html>
+  <html lang="en">
+    <head>
+      <title>{{block "title" .}}{{end}}</title>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <link href="/static/output.css" rel="stylesheet">
+      <link href="/static/style.css" rel="stylesheet">
+      <script src="/static/htmx.min.js"></script>
+      <script src="/static/json-enc.js"></script>
+      <script src="/static/subscript-numbers.js"></script>
+    </head>
+    <body class="bg-blue-light">
+      <div class="relative">
+        <div class="sticky top-0 left-0 right-0">
+          {{template "navbar" .}}
+          {{block "sticky-top" .}}{{end}}
+        </div>
+        <div id="content">
+          {{block "content" .}}{{end}}
+        </div>
       </div>
-      <div id="content">
-        {{block "content" .}}{{end}}
-      </div>
-    </div>
-  </body>
-</html>
+    </body>
+  </html>
 {{end}}
 
 {{block "error-page" .}}
@@ -51,3 +51,17 @@
   </div>
 {{end}}
 
+{{block "not-found-page" .}}
+  <!DOCTYPE html>
+  <html lang="en">
+    <head>
+      <title>Сторінка не знайдена</title>
+      <link href="/static/output.css" rel="stylesheet">
+    </head>
+    <body class="bg-blue-light">
+      <div class="flex justify-center items-center h-screen font-bold text-4xl">
+        Сторінка не знайдена
+      </div>
+    </body>
+  </html>
+{{end}}
