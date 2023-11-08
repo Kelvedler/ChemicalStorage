@@ -82,18 +82,21 @@ func ReagentGetRange(
 ) ([]ReagentFull, error) {
 	orderBy := "-created_at"
 	if len(src) >= 1 {
-		query := "SELECT * from reagent WHERE name ILIKE $4 OR formula ILIKE $4 ORDER BY $1 LIMIT $2 OFFSET $3"
+		query := "SELECT * FROM reagent WHERE name ILIKE $4 OR formula ILIKE $4 ORDER BY $1 LIMIT $2 OFFSET $3"
 		return reagentGetSlice(ctx, dbpool, query, orderBy, limit, offset, src+"%")
 	} else {
-		query := "SELECT * from reagent ORDER BY $1 LIMIT $2 OFFSET $3"
+		query := "SELECT * FROM reagent ORDER BY $1 LIMIT $2 OFFSET $3"
 		return reagentGetSlice(ctx, dbpool, query, orderBy, limit, offset)
 	}
 }
 
-func ReagentGet(ctx context.Context, dbpool *pgxpool.Pool, id string) (ReagentFull, error) {
-	query := "SELECT * from reagent WHERE id=$1"
-	var reagent ReagentFull
-	err := dbpool.QueryRow(ctx, query, id).
+func ReagentGet(
+	ctx context.Context,
+	dbpool *pgxpool.Pool,
+	id string,
+) (reagent ReagentFull, err error) {
+	query := "SELECT * FROM reagent WHERE id=$1"
+	err = dbpool.QueryRow(ctx, query, id).
 		Scan(&reagent.ID, &reagent.CreatedAt, &reagent.UpdatedAt, &reagent.Name, &reagent.Formula)
 	return reagent, err
 }

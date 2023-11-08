@@ -18,6 +18,7 @@ type reagentsData struct {
 	LastReagent   db.ReagentFull
 	NextOffset    int
 	Src           string
+	User          db.StorageUserFull
 }
 
 func newReagentsData(reagentsSlice []db.ReagentFull, src string, offset int) (data reagentsData) {
@@ -34,23 +35,34 @@ func newReagentsData(reagentsSlice []db.ReagentFull, src string, offset int) (da
 
 type reagentData struct {
 	Reagent db.ReagentFull
+	User    db.StorageUserFull
 }
 
-func (handlerContext *HandlerContext) Reagents(
-	rc RequestContext,
+type reagentNewData struct {
+	User       db.StorageUserFull
+	Name       string
+	Formula    string
+	NameErr    string
+	FormulaErr string
+}
+
+func Reagents(
+	rc *RequestContext,
 	w http.ResponseWriter,
 	r *http.Request,
 	_ httprouter.Params,
 ) {
 	offset := 0
 	src := ""
-	reagentsSlice, err := db.ReagentGetRange(r.Context(), handlerContext.dbpool, 20, offset, src)
+	reagentsSlice, err := db.ReagentGetRange(r.Context(), rc.dbpool, 20, offset, src)
 	if err != nil {
 		rc.logger.Error(err.Error())
 		common.DefaultErrorResp(w)
 		return
 	}
 	data := newReagentsData(reagentsSlice, src, offset)
+	storageUser, _ := db.StorageUserGetByID(r.Context(), rc.dbpool, rc.userID)
+	data.User = storageUser
 	tmpl := template.Must(
 		template.ParseFiles(
 			"templates/reagents.html",
@@ -61,14 +73,14 @@ func (handlerContext *HandlerContext) Reagents(
 	tmpl.Execute(w, data)
 }
 
-func (handlerContext *HandlerContext) Reagent(
-	rc RequestContext,
+func Reagent(
+	rc *RequestContext,
 	w http.ResponseWriter,
 	r *http.Request,
 	params httprouter.Params,
 ) {
 	reagent_id := params.ByName("id")
-	reagent, err := db.ReagentGet(r.Context(), handlerContext.dbpool, reagent_id)
+	reagent, err := db.ReagentGet(r.Context(), rc.dbpool, reagent_id)
 	if err != nil {
 		errStruct := db.ErrorAsStruct(err)
 		switch errStruct.(type) {
@@ -80,15 +92,17 @@ func (handlerContext *HandlerContext) Reagent(
 			panic(fmt.Sprintf("unexpected err type, %t", errStruct))
 		}
 	}
+	storageUser, _ := db.StorageUserGetByID(r.Context(), rc.dbpool, rc.userID)
 	data := reagentData{
 		Reagent: reagent,
+		User:    storageUser,
 	}
 	tmpl := template.Must(template.ParseFiles("templates/reagent.html", "templates/base.html"))
 	tmpl.Execute(w, data)
 }
 
-func (handlerContext *HandlerContext) ReagentCreate(
-	rc RequestContext,
+func ReagentCreate(
+	rc *RequestContext,
 	w http.ResponseWriter,
 	r *http.Request,
 	_ httprouter.Params,
@@ -96,11 +110,15 @@ func (handlerContext *HandlerContext) ReagentCreate(
 	tmpl := template.Must(
 		template.ParseFiles(
 			"templates/reagent-new.html",
-			"templates/reagents-assets.html",
 			"templates/base.html",
+			"templates/reagents-assets.html",
 		),
 	)
-	tmpl.Execute(w, nil)
+	storageUser, _ := db.StorageUserGetByID(r.Context(), rc.dbpool, rc.userID)
+	data := reagentNewData{
+		User: storageUser,
+	}
+	tmpl.Execute(w, data)
 }
 
 type ReagentsAPIForm struct {
@@ -108,8 +126,8 @@ type ReagentsAPIForm struct {
 	Offset int    `json:"offset" validate:"omitempty,min=0,max=10000" uaLocal:"зміщення"`
 }
 
-func (handlerContext *HandlerContext) ReagentsAPI(
-	rc RequestContext,
+func ReagentsAPI(
+	rc *RequestContext,
 	w http.ResponseWriter,
 	r *http.Request,
 	_ httprouter.Params,
@@ -126,7 +144,7 @@ func (handlerContext *HandlerContext) ReagentsAPI(
 	}
 
 	srcForm := ReagentsAPIForm{Src: src, Offset: offset}
-	err = handlerContext.validate.Struct(srcForm)
+	err = rc.validate.Struct(srcForm)
 	if err != nil {
 		err = common.LocalizeValidationErrors(err.(validator.ValidationErrors), srcForm)
 		rc.logger.Info(err.Error())
@@ -135,7 +153,7 @@ func (handlerContext *HandlerContext) ReagentsAPI(
 	}
 	reagentsSlice, err := db.ReagentGetRange(
 		r.Context(),
-		handlerContext.dbpool,
+		rc.dbpool,
 		20,
 		offset,
 		srcForm.Src,
@@ -143,9 +161,6 @@ func (handlerContext *HandlerContext) ReagentsAPI(
 	if err != nil {
 		rc.logger.Error(err.Error())
 		w.WriteHeader(400)
-		return
-	}
-	if len(reagentsSlice) == 0 {
 		return
 	}
 	data := newReagentsData(reagentsSlice, src, offset)
@@ -158,17 +173,17 @@ func (handlerContext *HandlerContext) ReagentsAPI(
 	tmpl.Execute(w, data)
 }
 
-func sanitizeReagentShort(handlerContext *HandlerContext, reagent *db.ReagentShort) {
-	sanitizer := handlerContext.sanitize
+func sanitizeReagentShort(rc *RequestContext, reagent *db.ReagentShort) {
+	sanitizer := rc.sanitize
 	reagent.Name = sanitizer.Sanitize(reagent.Name)
 	reagent.Formula = sanitizer.Sanitize(reagent.Formula)
 }
 
-func (handlerContext *HandlerContext) ReagentCreateAPI(
-	rc RequestContext,
+func ReagentCreateAPI(
+	rc *RequestContext,
 	w http.ResponseWriter,
 	r *http.Request,
-	params httprouter.Params,
+	_ httprouter.Params,
 ) {
 	var reagent db.ReagentShort
 	err := common.BindJSON(r, &reagent)
@@ -178,12 +193,12 @@ func (handlerContext *HandlerContext) ReagentCreateAPI(
 		return
 	}
 
-	sanitizeReagentShort(handlerContext, &reagent)
+	sanitizeReagentShort(rc, &reagent)
+	tmpl := template.Must(template.ParseFiles("templates/reagents-assets.html")).
+		Lookup("create-form")
 
-	err = handlerContext.validate.Struct(reagent)
+	err = rc.validate.Struct(reagent)
 	if err != nil {
-		tmpl := template.Must(template.ParseFiles("templates/reagents-assets.html")).
-			Lookup("create-form")
 		err = common.LocalizeValidationErrors(err.(validator.ValidationErrors), reagent)
 		rc.logger.Info(err.Error())
 		errMap := err.(common.ValidationError).Map()
@@ -192,15 +207,13 @@ func (handlerContext *HandlerContext) ReagentCreateAPI(
 		tmpl.Execute(w, errMap)
 		return
 	}
-	reargentNew, err := db.ReagentCreate(r.Context(), handlerContext.dbpool, reagent)
+	reargentNew, err := db.ReagentCreate(r.Context(), rc.dbpool, reagent)
 	if err != nil {
 		errStruct := db.ErrorAsStruct(err)
 		switch errStruct.(type) {
 		case db.UniqueViolation:
 			err = errStruct.(db.UniqueViolation).LocalizeUniqueViolation(db.ReagentShort{})
 			rc.logger.Info(err.Error())
-			tmpl := template.Must(template.ParseFiles("templates/reagents-assets.html")).
-				Lookup("create-form")
 			errMap := err.(db.DBError).Map()
 			errMap["Formula"] = reagent.Formula
 			errMap["Name"] = reagent.Name

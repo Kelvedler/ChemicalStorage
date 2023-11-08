@@ -1,4 +1,6 @@
 .env
 tailwindcss
 chemical_storage
+create_admin
+.sqllsrc.json
 
