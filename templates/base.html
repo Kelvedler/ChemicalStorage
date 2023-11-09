@@ -12,7 +12,7 @@
     <div class="grow"></div>
     {{if .User.Name}}
       <div class="w-1/12 text-white text-l select-none py-4">{{.User.Name}}</div>
-      <button hx-post="/api/v1/sign-out" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold w-1/6 py-4 rounded">Вийти</div>
+      <button hx-post="/api/v1/sign-out" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold w-1/6 py-4 rounded">Вийти</button>
     {{else}}
       <button onclick="window.location.href='/sign-in';" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold w-1/6 py-4 rounded">
         Увійти
@@ -34,15 +34,13 @@
       <script src="/static/json-enc.js"></script>
       <script src="/static/subscript-numbers.js"></script>
     </head>
-    <body class="bg-blue-light">
-      <div class="relative">
-        <div class="sticky top-0 left-0 right-0">
-          {{template "navbar" .}}
-          {{block "sticky-top" .}}{{end}}
-        </div>
-        <div id="content">
-          {{block "content" .}}{{end}}
-        </div>
+    <body class="bg-blue-light relative">
+      <div class="sticky top-0 left-0 right-0">
+        {{template "navbar" .}}
+        {{block "sticky-top" .}}{{end}}
+      </div>
+      <div id="content">
+        {{block "content" .}}{{end}}
       </div>
     </body>
   </html>
