@@ -10,3 +10,8 @@ CREATE TABLE IF NOT EXISTS storage_user(
   active boolean DEFAULT TRUE,
   UNIQUE(name)
 );
+
+CREATE TRIGGER mdt_storage_user
+  BEFORE UPDATE ON storage_user
+  FOR EACH ROW
+  EXECUTE PROCEDURE moddatetime (updated_at);
