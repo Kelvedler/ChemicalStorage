@@ -1,0 +1,13 @@
+{{template "base" .}}
+{{define "title"}}Користувачі{{end}}
+{{define "sticky-top"}}
+  {{template "users-bar" .}}
+{{end}}
+{{define "content"}}
+  <div class="flex justify-center">
+    <div class="w-1/2">
+      {{template "users-search" .}}
+    </div>
+  </div>
+{{end}}
+

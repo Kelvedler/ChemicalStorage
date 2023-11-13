@@ -26,15 +26,6 @@ var (
 	ErrExpiration = errors.New("Token expired")
 )
 
-func accessRightInAllowed(accessRight string, allowedRoles []string) bool {
-	for _, role := range allowedRoles {
-		if accessRight == role {
-			return true
-		}
-	}
-	return false
-}
-
 func JWTExpiration() time.Time {
 	return time.Now().Add(
 		time.Duration(env.Env.Jwt.ExpirationDeltaMinutes) * time.Minute,
@@ -48,7 +39,7 @@ func RenewalAllowed(issuedAt int64) bool {
 	return nowUnix > expUnix
 }
 
-func IssueJWT(user db.StorageUserFull) (string, error) {
+func IssueJWT(user db.StorageUser) (string, error) {
 	claims := jwt.MapClaims{}
 	claims[ClaimSubject] = user.ID.String()
 	claims[ClaimAccessRights] = user.Role
@@ -67,7 +58,6 @@ func ReissueJWT(claims jwt.MapClaims) (string, error) {
 func ValidateJWT(
 	logger *slog.Logger,
 	tokenString string,
-	allowedRoles []string,
 ) (jwt.MapClaims, bool) {
 	token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
 		return []byte(env.Env.SecretKey), nil
@@ -86,8 +76,8 @@ func ValidateJWT(
 		logger.Error(ErrSubject.Error())
 		return jwt.MapClaims{}, false
 	}
-	accessRights, ok := tokenClaims[ClaimAccessRights].(string)
-	if !ok || !accessRightInAllowed(accessRights, allowedRoles) {
+	_, ok = tokenClaims[ClaimAccessRights].(string)
+	if !ok {
 		logger.Info(ErrAccess.Error())
 		return jwt.MapClaims{}, false
 	}

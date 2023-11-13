@@ -61,7 +61,7 @@ func SignUpAPI(
 	err := common.BindJSON(r, &input)
 	if err != nil {
 		rc.logger.Error(err.Error())
-		common.DefaultErrorResp(w)
+		common.ErrorResp(w, common.Internal)
 		return
 	}
 	sanitizeSignUpInput(rc, &input)
@@ -74,12 +74,12 @@ func SignUpAPI(
 		tmpl.Execute(w, errMap)
 		return
 	}
-	newStorageUser := db.StorageUserDBInsert{
+	newStorageUser := db.StorageUser{
 		Name:     input.Name,
 		Password: input.Password1,
-		Role:     db.RoleUnconfirmed,
+		Role:     db.Unconfirmed,
 	}
-	err = rc.validate.Struct(newStorageUser)
+	err = rc.validate.StructPartial(newStorageUser, "Name", "Password", "Role")
 	if err != nil {
 		err = common.LocalizeValidationErrors(err.(validator.ValidationErrors), newStorageUser)
 		rc.logger.Info(err.Error())
@@ -91,7 +91,7 @@ func SignUpAPI(
 	hashedPassword, err := common.HashPassword([]byte(newStorageUser.Password))
 	if err != nil {
 		rc.logger.Error(err.Error())
-		common.DefaultErrorResp(w)
+		common.ErrorResp(w, common.Internal)
 		return
 	}
 	newStorageUser.Password = hashedPassword
@@ -113,7 +113,7 @@ func SignUpAPI(
 	err = auth.SetNewTokenCookie(w, storageUserFull)
 	if err != nil {
 		rc.logger.Error(err.Error())
-		common.DefaultErrorResp(w)
+		common.ErrorResp(w, common.Internal)
 		return
 	}
 

@@ -8,26 +8,21 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type ReagentShort struct {
-	Name    string `json:"name"    validate:"gte=3,lte=300" uaLocal:"назва"`
-	Formula string `json:"formula" validate:"gte=1,lte=50"  uaLocal:"формула"`
-}
-
-type ReagentFull struct {
+type Reagent struct {
 	ID        uuid.UUID `json:"id"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
-	Name      string    `json:"name"`
-	Formula   string    `json:"formula"`
+	Name      string    `json:"name"       validate:"gte=3,lte=300" uaLocal:"назва"`
+	Formula   string    `json:"formula"    validate:"gte=1,lte=50"  uaLocal:"формула"`
 }
 
 func ReagentCreate(
 	ctx context.Context,
 	dbpool *pgxpool.Pool,
-	newReagent ReagentShort,
-) (ReagentFull, error) {
+	newReagent Reagent,
+) (Reagent, error) {
 	query := "INSERT into reagent(name, formula) VALUES($1, $2) RETURNING id, created_at, updated_at, name, formula"
-	var createdReagent ReagentFull
+	var createdReagent Reagent
 	err := dbpool.QueryRow(
 		ctx,
 		query,
@@ -48,8 +43,8 @@ func reagentGetSlice(
 	dbpool *pgxpool.Pool,
 	query string,
 	args ...any,
-) ([]ReagentFull, error) {
-	reagentsSlice := make([]ReagentFull, 0)
+) ([]Reagent, error) {
+	reagentsSlice := make([]Reagent, 0)
 	rows, err := dbpool.Query(ctx, query, args...)
 	if err != nil {
 		return reagentsSlice, err
@@ -59,7 +54,7 @@ func reagentGetSlice(
 		return reagentsSlice, nil
 	}
 	for next {
-		var reagent ReagentFull
+		var reagent Reagent
 		rows.Scan(
 			&reagent.ID,
 			&reagent.CreatedAt,
@@ -79,7 +74,7 @@ func ReagentGetRange(
 	limit int,
 	offset int,
 	src string,
-) ([]ReagentFull, error) {
+) ([]Reagent, error) {
 	orderBy := "-created_at"
 	if len(src) >= 1 {
 		query := "SELECT * FROM reagent WHERE name ILIKE $4 OR formula ILIKE $4 ORDER BY $1 LIMIT $2 OFFSET $3"
@@ -94,7 +89,7 @@ func ReagentGet(
 	ctx context.Context,
 	dbpool *pgxpool.Pool,
 	id string,
-) (reagent ReagentFull, err error) {
+) (reagent Reagent, err error) {
 	query := "SELECT * FROM reagent WHERE id=$1"
 	err = dbpool.QueryRow(ctx, query, id).
 		Scan(&reagent.ID, &reagent.CreatedAt, &reagent.UpdatedAt, &reagent.Name, &reagent.Formula)

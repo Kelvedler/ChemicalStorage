@@ -41,10 +41,10 @@ func main() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	adminUser := db.StorageUserDBInsert{
+	adminUser := db.StorageUser{
 		Name:     "Адміністратор",
 		Password: hashedPassword,
-		Role:     db.RoleAdmin,
+		Role:     db.Admin,
 	}
 	ctx := context.Background()
 	env.InitEnv()

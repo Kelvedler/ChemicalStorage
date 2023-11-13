@@ -1,0 +1,30 @@
+{{block "users-search" .}}
+  <div id="search-results" >
+    {{range .StorageUsersSlice}}
+      <button onClick="window.location.href='/users/{{.ID}}';" class="flex bg-yellow mt-2 rounded-md shadow-lg shadow-gray w-full">
+        <ul class="list-none">
+          <div class="pl-8 pr-8 pt-3 text-left">{{.Name}}</div>
+          <div class="pl-8 pr-8 pb-3 text-left">{{.Role}}</div>
+        </ul>
+      </button>
+    {{end}}
+    {{if .NextOffset}}
+      <button onClick="window.location.href='/users/{{.LastStorageUser.ID}}';" hx-get="/api/v1/users/?src={{.Src}}&offset={{.NextOffset}}" hx-trigger="revealed" hx-swap="afterend" class="flex bg-yellow mt-2 rounded-md shadow-lg shadow-gray w-full">
+        <ul class="list-none">
+          <div class="pl-8 pr-8 pt-3 text-left">{{.LastStorageUser.Name}}</div>
+          <div class="pl-8 pr-8 pb-3 text-left">{{.LastStorageUser.Role}}</div>
+        </ul>
+      </button>
+    {{end}}
+  </div>
+{{end}}
+
+{{block "users-bar" .}}
+  <div class="flex justify-between bg-gray-light">
+    <div class="flex w-1/6"></div>
+    <div class="flex w-1/3">
+      <input type="search" name="src" placeholder="назва користувача" maxlength="50" class="flex w-full rounded-full px-6 my-2 border-2 border-gray-dark" hx-get="/api/v1/users/" hx-trigger="keyup changed delay:400ms" hx-target="#search-results" hx-swap="outerHTML"/>
+    </div>
+    <div class="w-1/6"></div>
+  </div>
+{{end}}

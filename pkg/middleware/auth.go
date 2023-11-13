@@ -18,38 +18,38 @@ func PerformAuth(
 	w http.ResponseWriter,
 	r *http.Request,
 	required bool,
-	allowedRoles []string,
-) (userID string, returnErr error) {
+) (userID, userRole string, returnErr error) {
 	accessToken, err := r.Cookie("access")
 	if required {
 		returnErr = errors.New("Unauthorized")
 	}
 	if err != nil {
-		return userID, returnErr
+		return userID, userRole, returnErr
 	}
 
-	tokenClaims, ok := auth.ValidateJWT(logger, accessToken.Value, allowedRoles)
+	tokenClaims, ok := auth.ValidateJWT(logger, accessToken.Value)
 	if !ok {
-		return userID, returnErr
+		return userID, userRole, returnErr
 	}
 
 	userID = tokenClaims[auth.ClaimSubject].(string)
+	userRole = tokenClaims[auth.ClaimAccessRights].(string)
 	if auth.RenewalAllowed(int64(tokenClaims[auth.ClaimIssuedAt].(float64))) {
 		auth.ReissueTokenCookie(w, tokenClaims)
-		return userID, nil
+		return userID, userRole, nil
 	}
 
 	storageUser, err := db.StorageUserGetByID(r.Context(), dbpool, userID)
 	if err == nil {
 		auth.SetNewTokenCookie(w, storageUser)
-		return userID, nil
+		return userID, userRole, nil
 	}
 
 	errStruct := db.ErrorAsStruct(err)
 	switch errStruct.(type) {
 	case db.InvalidUUID, db.DoesNotExist:
 		logger.Info("Not found")
-		return "", returnErr
+		return "", "", returnErr
 	default:
 		panic(fmt.Sprintf("unexpected err type, %t", errStruct))
 	}

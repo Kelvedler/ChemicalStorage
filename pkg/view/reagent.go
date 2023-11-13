@@ -14,14 +14,14 @@ import (
 )
 
 type reagentsData struct {
-	ReagentsSlice []db.ReagentFull
-	LastReagent   db.ReagentFull
+	ReagentsSlice []db.Reagent
+	LastReagent   db.Reagent
 	NextOffset    int
 	Src           string
-	User          db.StorageUserFull
+	Caller        db.StorageUser
 }
 
-func newReagentsData(reagentsSlice []db.ReagentFull, src string, offset int) (data reagentsData) {
+func newReagentsData(reagentsSlice []db.Reagent, src string, offset int) (data reagentsData) {
 	if len(reagentsSlice) > 1 {
 		data.ReagentsSlice = reagentsSlice[:len(reagentsSlice)-1]
 		data.LastReagent = reagentsSlice[len(reagentsSlice)-1]
@@ -34,12 +34,12 @@ func newReagentsData(reagentsSlice []db.ReagentFull, src string, offset int) (da
 }
 
 type reagentData struct {
-	Reagent db.ReagentFull
-	User    db.StorageUserFull
+	Reagent db.Reagent
+	Caller  db.StorageUser
 }
 
 type reagentNewData struct {
-	User       db.StorageUserFull
+	Caller     db.StorageUser
 	Name       string
 	Formula    string
 	NameErr    string
@@ -57,12 +57,12 @@ func Reagents(
 	reagentsSlice, err := db.ReagentGetRange(r.Context(), rc.dbpool, 20, offset, src)
 	if err != nil {
 		rc.logger.Error(err.Error())
-		common.DefaultErrorResp(w)
+		common.ErrorResp(w, common.Internal)
 		return
 	}
 	data := newReagentsData(reagentsSlice, src, offset)
 	storageUser, _ := db.StorageUserGetByID(r.Context(), rc.dbpool, rc.userID)
-	data.User = storageUser
+	data.Caller = storageUser
 	tmpl := template.Must(
 		template.ParseFiles(
 			"templates/reagents.html",
@@ -86,7 +86,7 @@ func Reagent(
 		switch errStruct.(type) {
 		case db.InvalidUUID, db.DoesNotExist:
 			rc.logger.Info("Not found")
-			common.ErrorRespNotFound(w)
+			common.ErrorResp(w, common.NotFound)
 			return
 		default:
 			panic(fmt.Sprintf("unexpected err type, %t", errStruct))
@@ -95,7 +95,7 @@ func Reagent(
 	storageUser, _ := db.StorageUserGetByID(r.Context(), rc.dbpool, rc.userID)
 	data := reagentData{
 		Reagent: reagent,
-		User:    storageUser,
+		Caller:  storageUser,
 	}
 	tmpl := template.Must(template.ParseFiles("templates/reagent.html", "templates/base.html"))
 	tmpl.Execute(w, data)
@@ -116,7 +116,7 @@ func ReagentCreate(
 	)
 	storageUser, _ := db.StorageUserGetByID(r.Context(), rc.dbpool, rc.userID)
 	data := reagentNewData{
-		User: storageUser,
+		Caller: storageUser,
 	}
 	tmpl.Execute(w, data)
 }
@@ -173,7 +173,7 @@ func ReagentsAPI(
 	tmpl.Execute(w, data)
 }
 
-func sanitizeReagentShort(rc *RequestContext, reagent *db.ReagentShort) {
+func sanitizeReagent(rc *RequestContext, reagent *db.Reagent) {
 	sanitizer := rc.sanitize
 	reagent.Name = sanitizer.Sanitize(reagent.Name)
 	reagent.Formula = sanitizer.Sanitize(reagent.Formula)
@@ -185,19 +185,19 @@ func ReagentCreateAPI(
 	r *http.Request,
 	_ httprouter.Params,
 ) {
-	var reagent db.ReagentShort
+	var reagent db.Reagent
 	err := common.BindJSON(r, &reagent)
 	if err != nil {
 		rc.logger.Error(err.Error())
-		common.DefaultErrorResp(w)
+		common.ErrorResp(w, common.Internal)
 		return
 	}
 
-	sanitizeReagentShort(rc, &reagent)
+	sanitizeReagent(rc, &reagent)
 	tmpl := template.Must(template.ParseFiles("templates/reagents-assets.html")).
 		Lookup("create-form")
 
-	err = rc.validate.Struct(reagent)
+	err = rc.validate.StructPartial(reagent, "Name", "Formula")
 	if err != nil {
 		err = common.LocalizeValidationErrors(err.(validator.ValidationErrors), reagent)
 		rc.logger.Info(err.Error())
@@ -212,7 +212,7 @@ func ReagentCreateAPI(
 		errStruct := db.ErrorAsStruct(err)
 		switch errStruct.(type) {
 		case db.UniqueViolation:
-			err = errStruct.(db.UniqueViolation).LocalizeUniqueViolation(db.ReagentShort{})
+			err = errStruct.(db.UniqueViolation).LocalizeUniqueViolation(db.Reagent{})
 			rc.logger.Info(err.Error())
 			errMap := err.(db.DBError).Map()
 			errMap["Formula"] = reagent.Formula

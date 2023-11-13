@@ -28,7 +28,7 @@ func setTokenCookie(w http.ResponseWriter, token string) error {
 	return nil
 }
 
-func SetNewTokenCookie(w http.ResponseWriter, user db.StorageUserFull) error {
+func SetNewTokenCookie(w http.ResponseWriter, user db.StorageUser) error {
 	token, err := IssueJWT(user)
 	if err != nil {
 		return err

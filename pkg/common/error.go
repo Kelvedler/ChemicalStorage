@@ -5,20 +5,35 @@ import (
 	"text/template"
 )
 
-func DefaultErrorResp(w http.ResponseWriter) {
+const (
+	NotFound     = "not-found"
+	Unauthorized = "unauthorized"
+	Forbidden    = "forbidden"
+	Internal     = "internal"
+)
+
+type errorData struct {
+	Title   string
+	Message string
+}
+
+func ErrorResp(w http.ResponseWriter, reason string) {
+	var data errorData
+	switch reason {
+	case NotFound:
+		data.Title = "Не знайдено"
+		data.Message = "Сторінка не знайдена"
+	case Unauthorized:
+		data.Title = "Не авторизований"
+		data.Message = "Користувач не авторизований"
+	case Forbidden:
+		data.Title = "Заборонено"
+		data.Message = "Відсутні права для використання даного ресурсу"
+	default:
+		data.Title = "Внутрішня помилка"
+		data.Message = "Щось пішло не так"
+	}
 	w.Header().Set("HX-Retarget", "#content")
 	tmpl := template.Must(template.ParseFiles("templates/base.html")).Lookup("error-page")
-	tmpl.Execute(w, nil)
-}
-
-func ErrorRespNotFound(w http.ResponseWriter) {
-	w.Header().Set("HX-Retarget", "#content")
-	tmpl := template.Must(template.ParseFiles("templates/base.html")).Lookup("not-found-page")
-	tmpl.Execute(w, nil)
-}
-
-func ErrorRespUnauthorized(w http.ResponseWriter) {
-	w.Header().Set("HX-Retarget", "#content")
-	tmpl := template.Must(template.ParseFiles("templates/base.html")).Lookup("unauthorized-page")
-	tmpl.Execute(w, nil)
+	tmpl.Execute(w, data)
 }

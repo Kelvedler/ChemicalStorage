@@ -6,12 +6,18 @@
     <button onClick="window.location.href='/reagents/';" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold w-1/6 py-4 rounded">
       Реагенти
     </button>
-    <button class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold w-1/6 py-4 rounded">
-      Склади
-    </button>
+    {{if eq .Caller.Role "assistant"}}
+      <button class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold w-1/6 py-4 rounded">
+        Склади
+      </button>
+    {{else if eq .Caller.Role "admin"}}
+      <button onclick="window.location.href='/users';" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold w-1/6 py-4 rounded">
+        Користувачі
+      </button>
+    {{end}}
     <div class="grow"></div>
-    {{if .User.Name}}
-      <div class="w-1/12 text-white text-l select-none py-4">{{.User.Name}}</div>
+    {{if .Caller.Name}}
+      <div class="w-1/12 text-white text-l select-none py-4">{{.Caller.Name}}</div>
       <button hx-post="/api/v1/sign-out" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold w-1/6 py-4 rounded">Вийти</button>
     {{else}}
       <button onclick="window.location.href='/sign-in';" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold w-1/6 py-4 rounded">
@@ -47,39 +53,27 @@
 {{end}}
 
 {{block "error-page" .}}
-  <div id="content">
-    <div class="flex justify-center items-center h-screen font-bold text-4xl">
-      Щось пішло не так
-    </div>
-  </div>
-{{end}}
-
-{{block "not-found-page" .}}
   <!DOCTYPE html>
   <html lang="en">
     <head>
-      <title>Сторінка не знайдена</title>
+      <title>{{.Title}}</title>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
       <link href="/static/output.css" rel="stylesheet">
+      <link href="/static/style.css" rel="stylesheet">
+      <script src="/static/htmx.min.js"></script>
     </head>
-    <body class="bg-blue-light">
-      <div class="flex justify-center items-center h-screen font-bold text-4xl">
-        Сторінка не знайдена
+    <body class="bg-blue-light h-screen">
+      <div class="h-1/3 w-screen"></div>
+      <div class="flex justify-center items-center h-1/3 w-screen font-bold text-4xl">
+        {{.Message}}
+      </div>
+      <div class="flex items-start justify-center h-1/3 w-screen">
+        <button onClick="window.location.href='/';" class="p-6 bg-gray-light border-2 border-solid border-gray-dark hover:bg-gray hover:text-white text-xl font-serif font-bold rounded-lg">
+          На головну
+        </button>
       </div>
     </body>
   </html>
 {{end}}
 
-{{block "unauthorized-page" .}}
-  <!DOCTYPE html>
-  <html lang="en">
-    <head>
-      <title>Користувач не авторизований</title>
-      <link href="/static/output.css" rel="stylesheet">
-    </head>
-    <body class="bg-blue-light">
-      <div class="flex justify-center items-center h-screen font-bold text-4xl">
-        Користувач не авторизований
-      </div>
-    </body>
-  </html>
-{{end}}

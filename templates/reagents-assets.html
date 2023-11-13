@@ -29,9 +29,11 @@
 {{block "reagents-bar" .}}
   <div class="flex justify-between bg-gray-light">
     <div class="flex w-1/6">
-      <button onClick="window.location.href='/reagent-new';" class="bg-gray-light hover:bg-gray hover:text-white text-xl font-serif font-bold w-full py-4 rounded">
-        Створити
-      </button>
+      {{if eq .Caller.Role "assistant"}}
+        <button onClick="window.location.href='/reagent-new';" class="bg-gray-light hover:bg-gray hover:text-white text-xl font-serif font-bold w-full py-4 rounded">
+          Створити
+        </button>
+      {{end}}
     </div>
     <div class="flex w-1/3">
       <input onKeyUp="return subscriptNumbers(event)" type="search" name="src" placeholder="назва реагенту чи формула" maxlength="50" class="flex w-full rounded-full px-6 my-2 border-2 border-gray-dark" hx-get="/api/v1/reagents/" hx-trigger="keyup changed delay:400ms" hx-target="#search-results" hx-swap="outerHTML"/>

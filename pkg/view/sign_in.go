@@ -29,9 +29,9 @@ func SignIn(
 	tmpl.Execute(w, nil)
 }
 
-func sanitizeStorageUserShort(
+func sanitizeStorageUser(
 	rc *RequestContext,
-	storageUser *db.StorageUserShort,
+	storageUser *db.StorageUser,
 ) {
 	sanitizer := rc.sanitize
 	storageUser.Name = sanitizer.Sanitize(storageUser.Name)
@@ -44,14 +44,14 @@ func SignInAPI(
 	r *http.Request,
 	_ httprouter.Params,
 ) {
-	var storageUserInput db.StorageUserShort
+	var storageUserInput db.StorageUser
 	err := common.BindJSON(r, &storageUserInput)
 	if err != nil {
 		rc.logger.Error(err.Error())
-		common.DefaultErrorResp(w)
+		common.ErrorResp(w, common.Internal)
 		return
 	}
-	sanitizeStorageUserShort(rc, &storageUserInput)
+	sanitizeStorageUser(rc, &storageUserInput)
 	tmpl := template.Must(template.ParseFiles("templates/sign-in-assets.html")).
 		Lookup("sign-in-form")
 
@@ -59,7 +59,7 @@ func SignInAPI(
 	errMap["InputErr"] = "Невірний логін або пароль"
 	errMap["Name"] = storageUserInput.Name
 	errMap["Password"] = storageUserInput.Password
-	err = rc.validate.Struct(storageUserInput)
+	err = rc.validate.StructPartial(storageUserInput, "Name", "Password")
 	if err != nil {
 		err = common.LocalizeValidationErrors(err.(validator.ValidationErrors), storageUserInput)
 		rc.logger.Info(err.Error())
@@ -94,7 +94,7 @@ func SignInAPI(
 	err = auth.SetNewTokenCookie(w, storageUser)
 	if err != nil {
 		rc.logger.Error(err.Error())
-		common.DefaultErrorResp(w)
+		common.ErrorResp(w, common.Internal)
 		return
 	}
 

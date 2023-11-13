@@ -11,10 +11,6 @@ import (
 	"github.com/Kelvedler/ChemicalStorage/pkg/db"
 )
 
-type userData struct {
-	User db.StorageUserFull
-}
-
 func Me(
 	rc *RequestContext,
 	w http.ResponseWriter,
@@ -27,14 +23,14 @@ func Me(
 		switch errStruct.(type) {
 		case db.InvalidUUID, db.DoesNotExist:
 			rc.logger.Info("Not found")
-			common.ErrorRespNotFound(w)
+			common.ErrorResp(w, common.NotFound)
 			return
 		default:
 			panic(fmt.Sprintf("unexpected err type, %t", errStruct))
 		}
 	}
-	data := userData{
-		User: storageUser,
+	data := CallerData{
+		Caller: storageUser,
 	}
 	tmpl := template.Must(template.ParseFiles("templates/me.html", "templates/base.html"))
 	tmpl.Execute(w, data)
