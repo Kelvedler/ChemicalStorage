@@ -2,7 +2,7 @@
 
 echo "Running database migrations"
 
-migrate -path=/app/migrations -database "postgres://local_user:local_pass@database/local_db?sslmode=disable" up
+migrate -path=/app/migrations -database "$DATABASE_URL?sslmode=disable" up
 
 if [ $? -eq 0 ]
 then

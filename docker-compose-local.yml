@@ -1,18 +1,5 @@
 version: '3'
 services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    depends_on:
-      database:
-        condition: service_started
-    ports:
-      - "8000:8000"
-    networks:
-      - app_default
-    volumes:
-      - .env:/app/.env
   database:
     image: postgres:16.0-alpine3.18
     environment:
@@ -21,12 +8,8 @@ services:
       - POSTGRES_PASSWORD=local_pass
     ports:
       - "5432:5432"
-    networks:
-      - app_default
     volumes:
       - pg_data_local:/var/lib/postgresql/data/
 volumes:
   pg_data_local:
-networks:
-  app_default:
-    driver: bridge
+
