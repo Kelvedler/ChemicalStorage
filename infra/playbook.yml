@@ -1,0 +1,60 @@
+---
+- name: Provision of Chemical Storage server
+  hosts: ["main"]
+
+  vars_files:
+    - "environments/default.yml"
+    - "environments/{{ env }}.yml"
+
+  tasks:
+    - name: Create project directory
+      ansible.builtin.file:
+        path: "{{ project_path }}"
+        state: directory
+        group: "{{ default_user }}"
+        owner: "{{ default_user }}"
+        mode: '755'
+      become: true
+      tags: ["project-dir"]
+
+    - name: Copy app env
+      ansible.builtin.template:
+        src: "app.env.j2"
+        dest: "{{ project_path }}/app.env"
+        group: "{{ default_user }}"
+        owner: "{{ default_user }}"
+        mode: '440'
+      tags: ["deploy", "deploy-app"]
+
+    - name: Copy app docker compose
+      ansible.builtin.template:
+        src: docker-compose-app.yml.j2
+        dest: "{{ project_path }}/docker-compose-app.yml"
+        group: "{{ default_user }}"
+        owner: "{{ default_user }}"
+        mode: '440'
+      tags: ["deploy", "deploy-app"]
+
+    - name: Copy services docker compose
+      ansible.builtin.template:
+        src: docker-compose-services.yml.j2
+        dest: "{{ project_path }}/docker-compose-services.yml"
+        group: "{{ default_user }}"
+        owner: "{{ default_user }}"
+        mode: '440'
+      tags: ["deploy", "deploy-services"]
+
+    - name: Pull app server image update
+      ansible.builtin.command: docker pull {{ docker_image_app_server }}:{{ docker_image_tag_app_server }}
+      changed_when: true
+      tags: ["deploy", "deploy-app"]
+
+    - name: Start/Update app server compose
+      ansible.builtin.command: docker-compose -p {{ compose_project_name }} -f {{ project_path }}/docker-compose-app-server.yml up --force-recreate -d
+      changed_when: true
+      tags: ["deploy", "deploy-app"]
+
+    - name: Start/Update services compose
+      ansible.builtin.command: docker-compose -p {{ compose_project_name }} -f {{ project_path }}/docker-compose-services.yml up --force-recreate -d
+      changed_when: true
+      tags: ["deploy", "deploy-services"]

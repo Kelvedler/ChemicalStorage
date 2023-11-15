@@ -1,0 +1,11 @@
+---
+# Domain records
+domain_record_app_server: "chemical-storage.{{ default_hosted_zone }}"
+
+# Docker images
+docker_image_tag_app_server: "main-latest"
+
+# App settings
+app_log_level: "INFO"
+app_jwt_secure_cookies: true
+app_jwt_exp_delta_minutes: 15

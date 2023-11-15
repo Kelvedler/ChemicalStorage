@@ -21,7 +21,6 @@ type Config struct {
 	LogLevel     slog.Level
 	DatabaseUrl  string
 	AllowedHosts string
-	Port         int
 	Jwt          Jwt
 }
 
@@ -33,13 +32,17 @@ type Jwt struct {
 
 var Env Config
 
+func ensureValueExists(key, value string, logger *slog.Logger) {
+	if value == "" {
+		logger.Error(fmt.Sprintf("Could not get '%s'", key))
+		os.Exit(1)
+	}
+}
+
 func setSecretKey(logger *slog.Logger) {
 	envKey := "SECRET_KEY"
 	secretKey := os.Getenv(envKey)
-	if secretKey == "" {
-		logger.Error(fmt.Sprintf("Could not get '%s'", envKey))
-		os.Exit(1)
-	}
+	ensureValueExists(envKey, secretKey, logger)
 	Env.SecretKey = secretKey
 }
 
@@ -62,33 +65,18 @@ func setLogLevel(logger *slog.Logger) {
 }
 
 func setDatabaseUrl(logger *slog.Logger) {
-	envKey := "DATABASE_URL"
-	databaseUrl := os.Getenv(envKey)
-	if databaseUrl == "" {
-		logger.Error(fmt.Sprintf("Could not get '%s'", envKey))
-		os.Exit(1)
-	}
-	Env.DatabaseUrl = databaseUrl
+	envDBURLKey := "DATABASE_URL"
+	databaseURL := os.Getenv(envDBURLKey)
+	ensureValueExists(envDBURLKey, databaseURL, logger)
+
+	Env.DatabaseUrl = databaseURL
 }
 
 func setAllowedHosts(logger *slog.Logger) {
 	envKey := "ALLOWED_HOSTS"
 	allowedHosts := os.Getenv(envKey)
-	if allowedHosts == "" {
-		logger.Error(fmt.Sprintf("Could not get '%s'", envKey))
-		os.Exit(1)
-	}
+	ensureValueExists(envKey, allowedHosts, logger)
 	Env.AllowedHosts = allowedHosts
-}
-
-func setPort(logger *slog.Logger) {
-	envKey := "PORT"
-	portInt, err := strconv.Atoi(os.Getenv(envKey))
-	if err != nil {
-		logger.Error(fmt.Sprintf("Could not get '%s'", envKey))
-		os.Exit(1)
-	}
-	Env.Port = portInt
 }
 
 func setJwt(logger *slog.Logger) {
@@ -97,11 +85,10 @@ func setJwt(logger *slog.Logger) {
 		logger.Error("Could not get 'JWT_SECURE_COOKIES'")
 		os.Exit(1)
 	}
-	domain := os.Getenv("JWT_DOMAIN")
-	if domain == "" {
-		logger.Error("Could not get 'JWT_DOMAIN'")
-		os.Exit(1)
-	}
+	jwtDomainKey := "JWT_DOMAIN"
+	domain := os.Getenv(jwtDomainKey)
+	ensureValueExists(jwtDomainKey, domain, logger)
+
 	exp, err := strconv.Atoi(os.Getenv("JWT_EXP_DELTA_MINUTES"))
 	if err != nil {
 		logger.Error("Could not get 'JWT_EXP_DELTA_MINUTES'")
@@ -125,6 +112,5 @@ func InitEnv() {
 	setLogLevel(logger)
 	setDatabaseUrl(logger)
 	setAllowedHosts(logger)
-	setPort(logger)
 	setJwt(logger)
 }

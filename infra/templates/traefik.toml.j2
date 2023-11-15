@@ -1,0 +1,25 @@
+[log]
+  level = "INFO"
+
+[accessLog]
+
+## Static configuration
+[entryPoints]
+  [entryPoints.web]
+    address = ":80"
+  [entryPoints.websecure]
+    address = ":443"
+
+[certificatesResolvers.LE.acme]
+  email = "{{ letsencrypt_email }}"
+  storage = "acme.json"
+  [certificatesResolvers.LE.acme.httpChallenge]
+    entryPoint = "web"
+
+[providers.docker]
+endpoint = "unix:///var/run/docker.sock"
+watch = true
+exposedByDefault = false
+
+[providers.file]
+  directory = "/etc/traefik"

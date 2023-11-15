@@ -1,0 +1,63 @@
+---
+- name: Provision of Traefik server
+  hosts: ["main"]
+
+  vars_files:
+    - "environments/default.yml"
+
+  tasks:
+    - name: Create project directory
+      ansible.builtin.file:
+        path: "{{ traefik_path }}"
+        state: directory
+        group: "{{ default_user }}"
+        owner: "{{ default_user }}"
+        mode: '755'
+      become: true
+      tags: ["project-dir"]
+
+    - name: Copy Traefik config
+      ansible.builtin.template:
+        src: traefik.toml.j2
+        dest: "{{ traefik_path }}/traefik.toml"
+        group: "{{ default_user }}"
+        owner: "{{ default_user }}"
+        mode: '440'
+      tags: ["traefik"]
+
+    - name: Create ACME data file
+      ansible.builtin.file:
+        path: "{{ traefik_path }}/acme.json"
+        state: touch
+        mode: '600'
+        owner: root
+        group: root
+      become: true
+      tags: ["traefik"]
+
+    - name: Copy Traefik compose
+      ansible.builtin.template:
+        src: docker-compose-traefik.yml.j2
+        dest: "{{ traefik_path }}/docker-compose-traefik.yml"
+        group: "{{ default_user }}"
+        owner: "{{ default_user }}"
+        mode: '440'
+      tags: ["traefik"]
+
+    - name: Check if docker network for Traefik exists
+      ansible.builtin.command: "docker network ls -f=\"name={{ traefik_network_name }}\" --format=\"{{ '{{' }} .Name {{ '}}' }}\""
+      changed_when: true
+      register: network_ids
+      tags: ["traefik"]
+
+    - name: Create docker network for Traefik
+      ansible.builtin.command: docker network create {{ traefik_network_name }}
+      when: traefik_network_name != network_ids.stdout
+      changed_when: traefik_network_name != network_ids.stdout
+      tags: ["traefik"]
+
+    - name: Start/Update Traefik compose
+      ansible.builtin.command: docker-compose -p {{ traefik_compose_project_name }} -f {{ traefik_path }}/docker-compose-traefik.yml up --force-recreate -d
+      changed_when: true
+      tags: ["traefik"]
+

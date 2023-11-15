@@ -1,0 +1,10 @@
+*
+!cmd
+!migrations
+!pkg
+!static
+!templates
+!go.mod
+!go.sum
+!docker-entrypoint.sh
+!update.sh

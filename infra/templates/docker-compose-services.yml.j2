@@ -1,0 +1,21 @@
+version: '3'
+services:
+  database:
+    image: {{ docker_image_postgres_service }}
+    environment:
+      - POSTGRES_DB={{ database_name }}
+      - POSTGRES_USER={{ database_user }}
+      - POSTGRES_PASSWORD={{ database_pass }}
+    volumes:
+      - pg_data:/var/lib/postgresql/data/
+    restart: unless-stopped
+    networks:
+      - default
+
+volumes:
+  pg_data:
+
+networks:
+  {{ traefik_network_name }}:
+    external: true
+

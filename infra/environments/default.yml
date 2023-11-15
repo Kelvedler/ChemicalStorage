@@ -1,0 +1,42 @@
+---
+default_user: "ansible"
+
+# Project
+project_name: "chemical-storage"
+project_path: "/opt/{{ project_name }}/{{ env }}"
+
+# Deploy
+deploy_branch: "{{ lookup('env', 'DEPLOY_BRANCH') }}"
+
+# Domain records
+default_hosted_zone: "kelvedler.dev"
+
+# LetsEncrypt
+letsencrypt_email: "hnflkmvjcm@gmail.com"
+
+# Docker images
+docker_image_traefik: "traefik:2.10.4"
+docker_image_postgres_service: "postgres:16.0-alpine3.18"
+docker_image_app_server: "kelvedler/chemical-storage"
+
+# Docker containers
+docker_app_name: "app"
+
+# Docker compose project name
+compose_project_name: "{{ project_name }}-{{ env }}"
+
+# Traefik
+traefik_path: "/opt/traefik"
+traefik_network_name: "traefik-pub-net"
+traefik_compose_project_name: "traefik"
+
+# App settings
+app_secret_key: "{{ lookup('env', 'APP_SECRET_KEY') }}"
+app_repository: "https://github.com/Kelvedler/ChemicalStorage"
+
+# Database
+database_name: "{{ project_name }}-{{ env }}"
+database_host: "database"
+database_port: 5432
+database_user: "{{ lookup('env', 'DATABASE_USER') }}"
+database_pass: "{{ lookup('env', 'DATABASE_PASS') }}"

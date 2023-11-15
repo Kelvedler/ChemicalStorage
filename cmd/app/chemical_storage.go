@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 
 	"github.com/go-playground/validator/v10"
@@ -21,6 +20,6 @@ func main() {
 	sanitize := common.GetSanitizer()
 	dbpool := db.GetConnectionPool(ctx, mainLogger)
 	router := view.BaseRouter(dbpool, sanitize, validate, mainLogger)
-	err := http.ListenAndServe(fmt.Sprintf(":%d", env.Env.Port), router)
+	err := http.ListenAndServe(":8000", router)
 	mainLogger.Error(err.Error())
 }
