@@ -1,7 +1,6 @@
 package view
 
 import (
-	"fmt"
 	"html/template"
 	"net/http"
 
@@ -77,10 +76,11 @@ func SignInAPI(
 		case db.DoesNotExist:
 			rc.logger.Info("Not found")
 			tmpl.Execute(w, errMap)
-			return
 		default:
-			panic(fmt.Sprintf("unexpected err type, %t", errStruct))
+			rc.logger.Error(err.Error())
+			common.ErrorResp(w, common.Internal)
 		}
+		return
 	}
 	passwordCorrect, err := common.ComparePasswords(storageUserInput.Password, storageUser.Password)
 	if !passwordCorrect {
@@ -90,6 +90,12 @@ func SignInAPI(
 			rc.logger.Error(err.Error())
 		}
 		tmpl.Execute(w, errMap)
+	}
+	if !storageUser.Active {
+		rc.logger.Info("Deactivated user")
+		errMap["InputErr"] = "Акаунт декативовано"
+		tmpl.Execute(w, errMap)
+		return
 	}
 	err = auth.SetNewTokenCookie(w, storageUser)
 	if err != nil {

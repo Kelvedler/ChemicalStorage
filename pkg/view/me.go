@@ -1,7 +1,6 @@
 package view
 
 import (
-	"fmt"
 	"html/template"
 	"net/http"
 
@@ -26,7 +25,9 @@ func Me(
 			common.ErrorResp(w, common.NotFound)
 			return
 		default:
-			panic(fmt.Sprintf("unexpected err type, %t", errStruct))
+			rc.logger.Error(err.Error())
+			common.ErrorResp(w, common.Internal)
+			return
 		}
 	}
 	data := CallerData{

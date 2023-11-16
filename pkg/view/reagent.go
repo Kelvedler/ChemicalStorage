@@ -89,7 +89,9 @@ func Reagent(
 			common.ErrorResp(w, common.NotFound)
 			return
 		default:
-			panic(fmt.Sprintf("unexpected err type, %t", errStruct))
+			rc.logger.Error(err.Error())
+			common.ErrorResp(w, common.Internal)
+			return
 		}
 	}
 	storageUser, _ := db.StorageUserGetByID(r.Context(), rc.dbpool, rc.userID)
@@ -220,7 +222,9 @@ func ReagentCreateAPI(
 			tmpl.Execute(w, errMap)
 			return
 		default:
-			panic(fmt.Sprintf("unexpected err type, %t", errStruct))
+			rc.logger.Error(err.Error())
+			common.ErrorResp(w, common.Internal)
+			return
 		}
 	}
 

@@ -1,7 +1,6 @@
 package view
 
 import (
-	"fmt"
 	"html/template"
 	"net/http"
 
@@ -107,7 +106,9 @@ func SignUpAPI(
 			tmpl.Execute(w, errMap)
 			return
 		default:
-			panic(fmt.Sprintf("unexpected err type, %t", errStruct))
+			rc.logger.Error(err.Error())
+			common.ErrorResp(w, common.Internal)
+			return
 		}
 	}
 	err = auth.SetNewTokenCookie(w, newStorageUser)

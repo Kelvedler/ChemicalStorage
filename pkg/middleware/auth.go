@@ -41,8 +41,12 @@ func PerformAuth(
 
 	storageUser, err := db.StorageUserGetByID(r.Context(), dbpool, userID)
 	if err == nil {
-		auth.SetNewTokenCookie(w, storageUser)
-		return userID, userRole, nil
+		if storageUser.Active {
+			auth.SetNewTokenCookie(w, storageUser)
+			return userID, storageUser.Role.Name, nil
+		} else {
+			return "", "", returnErr
+		}
 	}
 
 	errStruct := db.ErrorAsStruct(err)

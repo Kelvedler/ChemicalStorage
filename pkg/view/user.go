@@ -1,7 +1,6 @@
 package view
 
 import (
-	"fmt"
 	"html/template"
 	"net/http"
 	"strconv"
@@ -97,7 +96,9 @@ func User(
 			common.ErrorResp(w, common.NotFound)
 			return
 		default:
-			panic(fmt.Sprintf("unexpected err type, %t", errStruct))
+			rc.logger.Error(err.Error())
+			common.ErrorResp(w, common.Internal)
+			return
 		}
 	}
 	caller, _ := db.StorageUserGetByID(r.Context(), rc.dbpool, rc.userID)
@@ -216,7 +217,10 @@ func UserPutAPI(
 			w.WriteHeader(400)
 			return
 		default:
-			panic(fmt.Sprintf("unexpected err type, %t", errStruct))
+			rc.logger.Error(err.Error())
+			common.ErrorResp(w, common.Internal)
+			w.WriteHeader(500)
+			return
 		}
 	}
 }
