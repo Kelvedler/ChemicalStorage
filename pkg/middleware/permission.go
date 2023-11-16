@@ -8,14 +8,14 @@ import (
 
 var (
 	ErrorForbidden = errors.New("Request forbidden")
-	AllowAll       = []db.RoleName{db.Admin, db.Lecturer, db.Assistant, db.Unconfirmed}
-	AssistantOnly  = []db.RoleName{db.Assistant}
-	AdminOnly      = []db.RoleName{db.Admin}
+	AllowAll       = []db.Role{db.Admin, db.Lecturer, db.Assistant, db.Unconfirmed}
+	AssistantOnly  = []db.Role{db.Assistant}
+	AdminOnly      = []db.Role{db.Admin}
 )
 
-func CheckPermission(userRole string, allowedRoles []db.RoleName) error {
+func CheckPermission(userRole string, allowedRoles []db.Role) error {
 	for _, allowedRole := range allowedRoles {
-		if userRole == string(allowedRole) {
+		if userRole == allowedRole.Name {
 			return nil
 		}
 	}

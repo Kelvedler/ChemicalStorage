@@ -50,6 +50,9 @@ func PerformAuth(
 	case db.InvalidUUID, db.DoesNotExist:
 		logger.Info("Not found")
 		return "", "", returnErr
+	case db.ContextCanceled:
+		logger.Warn("Context canceled")
+		return "", "", returnErr
 	default:
 		panic(fmt.Sprintf("unexpected err type, %t", errStruct))
 	}

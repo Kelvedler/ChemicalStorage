@@ -7,9 +7,9 @@
       <div class="py-2 mt-4 mb-2 text-center">Роль</div>
       <div class="col-span-3">
         <select class="mt-4 mb-2 bg-gray-light rounded-lg" name="role">
-          <option {{if eq .User.Role "unconfirmed"}}selected{{end}} value="unconfirmed">Не підтверджений</option>
-          <option {{if eq .User.Role "assistant"}}selected{{end}} value="assistant">Лаборант</option>
-          <option {{if eq .User.Role "lecturer"}}selected{{end}} value="lecturer">Викладач</option>
+          <option {{if eq .User.Role.Name "unconfirmed"}}selected{{end}} value="unconfirmed">Не підтверджений</option>
+          <option {{if eq .User.Role.Name "assistant"}}selected{{end}} value="assistant">Лаборант</option>
+          <option {{if eq .User.Role.Name "lecturer"}}selected{{end}} value="lecturer">Викладач</option>
         </select>
       </div>
       <div></div>

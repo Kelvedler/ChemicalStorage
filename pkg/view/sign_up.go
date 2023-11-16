@@ -79,7 +79,7 @@ func SignUpAPI(
 		Password: input.Password1,
 		Role:     db.Unconfirmed,
 	}
-	err = rc.validate.StructPartial(newStorageUser, "Name", "Password", "Role")
+	err = rc.validate.StructPartial(newStorageUser, "Name", "Password")
 	if err != nil {
 		err = common.LocalizeValidationErrors(err.(validator.ValidationErrors), newStorageUser)
 		rc.logger.Info(err.Error())
@@ -95,7 +95,7 @@ func SignUpAPI(
 		return
 	}
 	newStorageUser.Password = hashedPassword
-	storageUserFull, err := db.StorageUserCreate(r.Context(), rc.dbpool, newStorageUser)
+	err = newStorageUser.StorageUserCreate(r.Context(), rc.dbpool)
 	if err != nil {
 		errStruct := db.ErrorAsStruct(err)
 		switch errStruct.(type) {
@@ -110,7 +110,7 @@ func SignUpAPI(
 			panic(fmt.Sprintf("unexpected err type, %t", errStruct))
 		}
 	}
-	err = auth.SetNewTokenCookie(w, storageUserFull)
+	err = auth.SetNewTokenCookie(w, newStorageUser)
 	if err != nil {
 		rc.logger.Error(err.Error())
 		common.ErrorResp(w, common.Internal)

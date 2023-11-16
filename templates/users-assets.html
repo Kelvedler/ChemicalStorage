@@ -4,7 +4,7 @@
       <button onClick="window.location.href='/users/{{.ID}}';" class="flex bg-yellow mt-2 rounded-md shadow-lg shadow-gray w-full">
         <ul class="list-none">
           <div class="pl-8 pr-8 pt-3 text-left">{{.Name}}</div>
-          <div class="pl-8 pr-8 pb-3 text-left">{{.Role}}</div>
+          <div class="pl-8 pr-8 pb-3 text-left">{{.Role.NameLocal}}</div>
         </ul>
       </button>
     {{end}}
@@ -12,7 +12,7 @@
       <button onClick="window.location.href='/users/{{.LastStorageUser.ID}}';" hx-get="/api/v1/users/?src={{.Src}}&offset={{.NextOffset}}" hx-trigger="revealed" hx-swap="afterend" class="flex bg-yellow mt-2 rounded-md shadow-lg shadow-gray w-full">
         <ul class="list-none">
           <div class="pl-8 pr-8 pt-3 text-left">{{.LastStorageUser.Name}}</div>
-          <div class="pl-8 pr-8 pb-3 text-left">{{.LastStorageUser.Role}}</div>
+          <div class="pl-8 pr-8 pb-3 text-left">{{.LastStorageUser.Role.NameLocal}}</div>
         </ul>
       </button>
     {{end}}

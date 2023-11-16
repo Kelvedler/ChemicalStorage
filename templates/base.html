@@ -6,19 +6,19 @@
     <button onClick="window.location.href='/reagents/';" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold w-1/6 py-4 rounded">
       Реагенти
     </button>
-    {{if eq .Caller.Role "assistant"}}
+    {{if eq .Caller.Role.Name "assistant"}}
       <button class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold w-1/6 py-4 rounded">
         Склади
       </button>
-    {{else if eq .Caller.Role "admin"}}
+    {{else if eq .Caller.Role.Name "admin"}}
       <button onclick="window.location.href='/users';" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold w-1/6 py-4 rounded">
         Користувачі
       </button>
     {{end}}
     <div class="grow"></div>
     {{if .Caller.Name}}
-      <div class="w-1/12 text-white text-l select-none py-4">{{.Caller.Name}}</div>
-      <button hx-post="/api/v1/sign-out" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold w-1/6 py-4 rounded">Вийти</button>
+      <button onClick="window.location.href='/me';" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold w-1/6 py-4 rounded">{{.Caller.Name}}</button>
+      <button hx-post="/api/v1/sign-out" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold w-1/12 py-4 rounded">Вийти</button>
     {{else}}
       <button onclick="window.location.href='/sign-in';" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold w-1/6 py-4 rounded">
         Увійти

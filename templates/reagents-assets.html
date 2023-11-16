@@ -29,7 +29,7 @@
 {{block "reagents-bar" .}}
   <div class="flex justify-between bg-gray-light">
     <div class="flex w-1/6">
-      {{if eq .Caller.Role "assistant"}}
+      {{if eq .Caller.Role.Name "assistant"}}
         <button onClick="window.location.href='/reagent-new';" class="bg-gray-light hover:bg-gray hover:text-white text-xl font-serif font-bold w-full py-4 rounded">
           Створити
         </button>

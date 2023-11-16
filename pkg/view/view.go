@@ -49,7 +49,7 @@ func baseWrapper(
 	handler Handle,
 	handlerContext *HandlerContext,
 	authRequired bool,
-	allowedRoles []db.RoleName,
+	allowedRoles []db.Role,
 ) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		logger := middleware.NewRequestLogger()

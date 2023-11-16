@@ -50,7 +50,7 @@ func main() {
 	env.InitEnv()
 	mainLogger := common.MainLogger()
 	dbpool := db.GetConnectionPool(ctx, mainLogger)
-	_, err = db.StorageUserCreate(ctx, dbpool, adminUser)
+	err = adminUser.StorageUserCreate(ctx, dbpool)
 	if err != nil {
 		fmt.Println(err)
 	} else {

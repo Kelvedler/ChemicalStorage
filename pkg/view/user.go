@@ -194,7 +194,12 @@ func UserPutAPI(
 		w.WriteHeader(400)
 		return
 	}
-	err = rc.validate.StructPartial(user, "Role", "Active")
+	if user.Role == db.Admin {
+		rc.logger.Info("Can't set admin role")
+		w.WriteHeader(403)
+		return
+	}
+	err = rc.validate.StructPartial(user, "Active")
 	if err != nil {
 		err = common.LocalizeValidationErrors(err.(validator.ValidationErrors), user)
 		rc.logger.Info(err.Error())

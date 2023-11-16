@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -39,6 +40,8 @@ type InvalidUUID struct{}
 
 type DoesNotExist struct{}
 
+type ContextCanceled struct{}
+
 func ErrorAsStruct(err error) interface{} {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
@@ -60,6 +63,8 @@ func ErrorAsStruct(err error) interface{} {
 		switch err {
 		case pgx.ErrNoRows:
 			return DoesNotExist{}
+		case context.Canceled:
+			return ContextCanceled{}
 		default:
 			panic(fmt.Sprintf("unforseen case - %s", err))
 		}

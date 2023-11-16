@@ -12,23 +12,38 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type RoleName string
+type Role struct {
+	Name      string
+	NameLocal string
+}
 
-const (
-	Admin       RoleName = "admin"
-	Assistant   RoleName = "assistant"
-	Lecturer    RoleName = "lecturer"
-	Unconfirmed RoleName = "unconfirmed"
+var (
+	Admin = Role{
+		Name:      "admin",
+		NameLocal: "адміністратор",
+	}
+	Assistant = Role{
+		Name:      "assistant",
+		NameLocal: "лаборант",
+	}
+	Lecturer = Role{
+		Name:      "lecturer",
+		NameLocal: "викладач",
+	}
+	Unconfirmed = Role{
+		Name:      "unconfirmed",
+		NameLocal: "не підтверджений",
+	}
 )
 
-func IsValidRole(role string) bool {
-	roleNames := []RoleName{Admin, Assistant, Lecturer, Unconfirmed}
-	for _, roleName := range roleNames {
-		if role == string(roleName) {
-			return true
+func StringToRole(roleStr string) (Role, error) {
+	roles := []Role{Admin, Assistant, Lecturer, Unconfirmed}
+	for _, role := range roles {
+		if roleStr == role.Name {
+			return role, nil
 		}
 	}
-	return false
+	return Role{}, RoleInvalid
 }
 
 var RoleInvalid = errors.New("Storage user role is not valid")
@@ -48,7 +63,7 @@ type StorageUser struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 	Name      string    `json:"name"       validate:"gte=3,lte=50" uaLocal:"логін"`
-	Role      RoleName  `json:"role"                               uaLocal:"роль"`
+	Role      Role      `json:"role"                               uaLocal:"роль"`
 	Password  string    `json:"password"   validate:"gte=6,lte=20" uaLocal:"пароль"`
 	Active    bool      `json:"active"`
 }
@@ -77,10 +92,11 @@ func (input StorageUserInput) StorageUserBind() (output StorageUser, err error) 
 	}
 	output.Name = input.Name
 	if input.Role != "" {
-		if !IsValidRole(input.Role) {
-			return StorageUser{}, nil
+		role, err := StringToRole(input.Role)
+		if err != nil {
+			return StorageUser{}, err
 		} else {
-			output.Role = RoleName(input.Role)
+			output.Role = role
 		}
 	}
 	output.Password = input.Password
@@ -96,31 +112,24 @@ func (input StorageUserInput) StorageUserBind() (output StorageUser, err error) 
 	return output, nil
 }
 
-func StorageUserCreate(
+func (newStorageUser *StorageUser) StorageUserCreate(
 	ctx context.Context,
 	dbpool *pgxpool.Pool,
-	newStorageUser StorageUser,
-) (createdStorageUser StorageUser, err error) {
-	if newStorageUser.Role == "" {
-		newStorageUser.Role = Unconfirmed
-	}
-	query := "INSERT into storage_user(name, password, role) VALUES($1, $2, $3) RETURNING id, created_at, updated_at, name, role, password, active"
-	err = dbpool.QueryRow(
+) error {
+	query := "INSERT into storage_user(name, password, role) VALUES($1, $2, $3) RETURNING id, created_at, updated_at, active"
+	err := dbpool.QueryRow(
 		ctx,
 		query,
 		newStorageUser.Name,
 		newStorageUser.Password,
-		newStorageUser.Role,
+		newStorageUser.Role.Name,
 	).Scan(
-		&createdStorageUser.ID,
-		&createdStorageUser.CreatedAt,
-		&createdStorageUser.UpdatedAt,
-		&createdStorageUser.Name,
-		&createdStorageUser.Role,
-		&createdStorageUser.Password,
-		&createdStorageUser.Active,
+		&newStorageUser.ID,
+		&newStorageUser.CreatedAt,
+		&newStorageUser.UpdatedAt,
+		&newStorageUser.Active,
 	)
-	return createdStorageUser, err
+	return err
 }
 
 func storageUserGetSlice(
@@ -139,16 +148,23 @@ func storageUserGetSlice(
 		return storageUsersSlice, nil
 	}
 	for next {
+		var roleStr string
 		var storageUser StorageUser
 		rows.Scan(
 			&storageUser.ID,
 			&storageUser.CreatedAt,
 			&storageUser.UpdatedAt,
 			&storageUser.Name,
-			&storageUser.Role,
+			&roleStr,
 			&storageUser.Password,
 			&storageUser.Active,
 		)
+		role, err := StringToRole(roleStr)
+		if err != nil {
+			return nil, err
+		} else {
+			storageUser.Role = role
+		}
 		storageUsersSlice = append(storageUsersSlice, storageUser)
 		next = rows.Next()
 	}
@@ -179,15 +195,24 @@ func storageUserGet(
 	query string,
 	args ...any,
 ) (storageUser StorageUser, err error) {
+	var roleStr string
 	err = dbpool.QueryRow(ctx, query, args...).Scan(
 		&storageUser.ID,
 		&storageUser.CreatedAt,
 		&storageUser.UpdatedAt,
 		&storageUser.Name,
-		&storageUser.Role,
+		&roleStr,
 		&storageUser.Password,
 		&storageUser.Active,
 	)
+	if err != nil {
+		return StorageUser{}, err
+	}
+	role, err := StringToRole(roleStr)
+	if err != nil {
+		return StorageUser{}, err
+	}
+	storageUser.Role = role
 	return storageUser, err
 }
 
@@ -215,7 +240,7 @@ func StorageUserUpdate(
 	updateData StorageUser,
 ) error {
 	query := "UPDATE storage_user SET role=$2, active=$3 WHERE id=$1"
-	result, err := dbpool.Exec(ctx, query, updateData.ID, updateData.Role, updateData.Active)
+	result, err := dbpool.Exec(ctx, query, updateData.ID, updateData.Role.Name, updateData.Active)
 	affectedRows := result.RowsAffected()
 	if err != nil {
 		return err

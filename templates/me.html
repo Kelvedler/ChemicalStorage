@@ -5,7 +5,11 @@
     <div class="flex bg-yellow mt-2 rounded-md w-1/2">
       <ul class="list-none">
         <div class="pl-8 pr-8 pt-3 text-left">{{.Caller.Name}}</div>
-        <div class="pl-8 pr-8 pb-3 text-left">{{.Caller.Role}}</div>
+        {{if eq .Caller.Role.Name "unconfirmed"}}
+          <div class="pl-8 pr-8 pb-3 text-left">Користувач не підтверджений, зверніться до адміністратора.</div>
+        {{else}}
+          <div class="pl-8 pr-8 pb-3 text-left">{{.Caller.Role.NameLocal}}</div>
+        {{end}}
       </ul>
     </div>
   </div>

@@ -42,7 +42,7 @@ func RenewalAllowed(issuedAt int64) bool {
 func IssueJWT(user db.StorageUser) (string, error) {
 	claims := jwt.MapClaims{}
 	claims[ClaimSubject] = user.ID.String()
-	claims[ClaimAccessRights] = user.Role
+	claims[ClaimAccessRights] = user.Role.Name
 	claims[ClaimIssuedAt] = time.Now().Unix()
 	claims[ClaimExpirationTime] = JWTExpiration().Unix()
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
