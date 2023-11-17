@@ -45,11 +45,16 @@ func ReissueTokenCookie(w http.ResponseWriter, claims jwt.MapClaims) error {
 }
 
 func SetEmptyTokenCookie(w http.ResponseWriter) {
+	jwtEnv := env.Env.Jwt
 	cookie := http.Cookie{
-		Name:    "access",
-		Value:   "",
-		Path:    cookiePath,
-		Expires: time.Unix(0, 0),
+		Name:     "access",
+		Value:    "",
+		Path:     cookiePath,
+		Domain:   jwtEnv.Domain,
+		Secure:   jwtEnv.SecureCookies,
+		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
+		Expires:  time.Unix(0, 0),
 	}
 	http.SetCookie(w, &cookie)
 }
