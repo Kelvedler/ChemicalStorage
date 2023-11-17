@@ -1,9 +1,9 @@
 ---
 # Domain records
-domain_record_app_server: "chemical-storage.{{ default_hosted_zone }}"
+domain_record_app: "chemical-storage.{{ default_hosted_zone }}"
 
 # Docker images
-docker_image_tag_app_server: "main-latest"
+docker_image_tag_app: "main-latest"
 
 # App settings
 app_log_level: "INFO"

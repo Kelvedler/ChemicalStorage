@@ -1,0 +1,28 @@
+version: '3'
+services:
+  {{ docker_app_name }}:
+    image: "{{ docker_image_app }}:{{ docker_image_tag_app }}"
+    env_file:
+      - {{ project_path }}/app.env
+    restart: unless-stopped
+    networks:
+      - {{ traefik_network_name }}
+      - default
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network={{ traefik_network_name }}"
+
+      # Http router 'app'
+      - "traefik.http.routers.{{ env }}-{{ project_name }}-app.entrypoints=websecure"
+      - "traefik.http.routers.{{ env }}-{{ project_name }}-app.rule=Host(`{{ domain_record_app }}`)"
+      - "traefik.http.routers.{{ env }}-{{ project_name }}-app.service={{ env }}-{{ project_name }}-app"
+      - "traefik.http.routers.{{ env }}-{{ project_name }}-app.tls=true"
+      - "traefik.http.routers.{{ env }}-{{ project_name }}-app.tls.certresolver=LE"
+
+      # Service 'app'
+      - "traefik.http.services.{{ env }}-{{ project_name }}-app.loadbalancer.server.port=8000"
+      - "traefik.http.services.{{ env }}-{{ project_name }}-app.loadbalancer.server.scheme=http"
+
+networks:
+  {{ traefik_network_name }}:
+    external: true

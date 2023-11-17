@@ -17,7 +17,7 @@ letsencrypt_email: "hnflkmvjcm@gmail.com"
 # Docker images
 docker_image_traefik: "traefik:2.10.4"
 docker_image_postgres_service: "postgres:16.0-alpine3.18"
-docker_image_app_server: "kelvedler/chemical-storage"
+docker_image_app: "kelvedler/chemical-storage"
 
 # Docker containers
 docker_app_name: "app"
