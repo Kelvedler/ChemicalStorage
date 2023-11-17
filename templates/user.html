@@ -22,7 +22,7 @@
       </div>
       <div class="col-span-3"></div>
       <div></div>
-      <button hx-put="/api/v1/users/{{.User.ID}}" hx-ext="json-enc" hx-target="#dump" hx-include="[name='role'], [name='active']" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold col-span-3 justify-center py-4 my-4 rounded-md">
+    <button hx-put="/api/v1/users/{{.User.ID}}" hx-ext="json-enc" hx-target="#dump" hx-include="[name='role'], [name='active']" hx-headers='{"_xsrf": "{{ .UserPutXsrf }}"}' class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold col-span-3 justify-center py-4 my-4 rounded-md">
         Внести зміни
       </button>
       <div id="dump"></div>

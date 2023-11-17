@@ -60,7 +60,7 @@
       <div class="h-9 min-h-full col-span-2"></div>
       <div class="col-span-8 py-1">{{.FormulaErr}}</div>
       <div class="col-span-2"></div>
-      <button hx-post="/api/v1/reagents" hx-ext="json-enc" hx-target="#create-form" hx-include="[name='name'], [name='formula']" hx-swap="outerHTML" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold col-span-6 justify-center py-4 rounded-md">Створити</button>
+      <button hx-post="/api/v1/reagents" hx-ext="json-enc" hx-target="#create-form" hx-include="[name='name'], [name='formula']" hx-headers='{"_xsrf": "{{ .ReagentPostXsrf }}"}' hx-swap="outerHTML" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold col-span-6 justify-center py-4 rounded-md">Створити</button>
     </div>
   </div>
 {{end}}

@@ -1,15 +1,18 @@
 package view
 
 import (
+	"fmt"
 	"html/template"
 	"net/http"
 	"strconv"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/julienschmidt/httprouter"
+	"golang.org/x/net/xsrftoken"
 
 	"github.com/Kelvedler/ChemicalStorage/pkg/common"
 	"github.com/Kelvedler/ChemicalStorage/pkg/db"
+	"github.com/Kelvedler/ChemicalStorage/pkg/env"
 )
 
 type storageUsersData struct {
@@ -71,8 +74,9 @@ func Users(
 }
 
 type userByIDData struct {
-	User   db.StorageUser
-	Caller db.StorageUser
+	User        db.StorageUser
+	Caller      db.StorageUser
+	UserPutXsrf string
 }
 
 func User(
@@ -102,9 +106,15 @@ func User(
 		}
 	}
 	caller, _ := db.StorageUserGetByID(r.Context(), rc.dbpool, rc.userID)
+	userPutXsrf := xsrftoken.Generate(
+		env.Env.SecretKey,
+		caller.ID.String(),
+		fmt.Sprintf("/api/v1/users/%s", user_id),
+	)
 	data := userByIDData{
-		Caller: caller,
-		User:   storageUser,
+		Caller:      caller,
+		User:        storageUser,
+		UserPutXsrf: userPutXsrf,
 	}
 	tmpl := template.Must(
 		template.ParseFiles(

@@ -12,7 +12,6 @@ import (
 	"github.com/microcosm-cc/bluemonday"
 
 	"github.com/Kelvedler/ChemicalStorage/pkg/common"
-	"github.com/Kelvedler/ChemicalStorage/pkg/db"
 	"github.com/Kelvedler/ChemicalStorage/pkg/env"
 	"github.com/Kelvedler/ChemicalStorage/pkg/middleware"
 )
@@ -48,8 +47,7 @@ type Handle func(*RequestContext, http.ResponseWriter, *http.Request, httprouter
 func baseWrapper(
 	handler Handle,
 	handlerContext *HandlerContext,
-	authRequired bool,
-	allowedRoles []db.Role,
+	settings middleware.Settings,
 ) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		logger := middleware.NewRequestLogger()
@@ -59,20 +57,31 @@ func baseWrapper(
 			logger.Info(fmt.Sprintf("Host %s not allowed", r.Host))
 			return
 		}
-		userID, userRole, err := middleware.PerformAuth(
-			logger,
-			handlerContext.dbpool,
-			w,
-			r,
-			authRequired,
-		)
-		if err != nil {
-			logger.Info(err.Error())
-			common.ErrorResp(w, common.Unauthorized)
+		var userID string
+		var userRole string
+		var err error
+		if !settings.AuthExempt {
+			userID, userRole, err = middleware.PerformAuth(
+				logger,
+				handlerContext.dbpool,
+				w,
+				r,
+				settings.AuthRequired,
+			)
+			if err != nil {
+				logger.Info(err.Error())
+				common.ErrorResp(w, common.Unauthorized)
+				return
+			}
+
+		}
+		if !settings.XsrfExempt && !middleware.ValidateForXSRF(r, userID) {
+			common.ErrorResp(w, common.Forbidden)
+			logger.Warn("XSRF token invalid")
 			return
 		}
-		if authRequired {
-			err = middleware.CheckPermission(userRole, allowedRoles)
+		if settings.AuthRequired {
+			err = middleware.CheckPermission(userRole, settings.AllowedRoles)
 			if err != nil {
 				logger.Info(err.Error())
 				common.ErrorResp(w, common.Forbidden)
@@ -108,45 +117,45 @@ func BaseRouter(
 	router := httprouter.New()
 	handlerContext := newHandlerContext(dbpool, sanitize, validate)
 
-	router.GET("/favicon.ico", baseWrapper(Favicon, handlerContext, false, middleware.AllowAll))
+	router.GET("/favicon.ico", baseWrapper(Favicon, handlerContext, middleware.UnrestrictedNoAuth))
 	router.ServeFiles("/static/*filepath", http.Dir(staticFilepath(mainLogger)))
-	router.GET("/", baseWrapper(Index, handlerContext, false, middleware.AllowAll))
-	router.GET("/sign-in", baseWrapper(SignIn, handlerContext, false, middleware.AllowAll))
-	router.GET("/sign-up", baseWrapper(SignUp, handlerContext, false, middleware.AllowAll))
-	router.GET("/me", baseWrapper(Me, handlerContext, true, middleware.AllowAll))
-	router.GET("/users/", baseWrapper(Users, handlerContext, true, middleware.AdminOnly))
-	router.GET("/users/:id", baseWrapper(User, handlerContext, true, middleware.AdminOnly))
+	router.GET("/", baseWrapper(Index, handlerContext, middleware.Unrestricted))
+	router.GET("/sign-in", baseWrapper(SignIn, handlerContext, middleware.UnrestrictedNoAuth))
+	router.GET("/sign-up", baseWrapper(SignUp, handlerContext, middleware.UnrestrictedNoAuth))
+	router.GET("/me", baseWrapper(Me, handlerContext, middleware.Unrestricted))
+	router.GET("/users/", baseWrapper(Users, handlerContext, middleware.AdminOnlyView))
+	router.GET("/users/:id", baseWrapper(User, handlerContext, middleware.AdminOnlyView))
 	router.GET(
 		"/reagent-new",
-		baseWrapper(ReagentCreate, handlerContext, true, middleware.AssistantOnly),
+		baseWrapper(ReagentCreate, handlerContext, middleware.AssistantOnlyView),
 	)
-	router.GET("/reagents/", baseWrapper(Reagents, handlerContext, false, middleware.AllowAll))
-	router.GET("/reagents/:id", baseWrapper(Reagent, handlerContext, false, middleware.AllowAll))
+	router.GET("/reagents/", baseWrapper(Reagents, handlerContext, middleware.Unrestricted))
+	router.GET("/reagents/:id", baseWrapper(Reagent, handlerContext, middleware.Unrestricted))
 
 	router.POST(
 		"/api/v1/sign-in",
-		baseWrapper(SignInAPI, handlerContext, false, middleware.AllowAll),
+		baseWrapper(SignInAPI, handlerContext, middleware.Unrestricted),
 	)
 	router.POST(
 		"/api/v1/sign-out",
-		baseWrapper(SignOutAPI, handlerContext, false, middleware.AllowAll),
+		baseWrapper(SignOutAPI, handlerContext, middleware.Unrestricted),
 	)
 	router.POST(
 		"/api/v1/sign-up",
-		baseWrapper(SignUpAPI, handlerContext, false, middleware.AllowAll),
+		baseWrapper(SignUpAPI, handlerContext, middleware.Unrestricted),
 	)
 	router.PUT(
 		"/api/v1/users/:id",
-		baseWrapper(UserPutAPI, handlerContext, true, middleware.AdminOnly),
+		baseWrapper(UserPutAPI, handlerContext, middleware.AdminOnlyAPI),
 	)
-	router.GET("/api/v1/users/", baseWrapper(UsersAPI, handlerContext, true, middleware.AdminOnly))
+	router.GET("/api/v1/users/", baseWrapper(UsersAPI, handlerContext, middleware.AdminOnlyAPI))
 	router.GET(
 		"/api/v1/reagents/",
-		baseWrapper(ReagentsAPI, handlerContext, false, middleware.AllowAll),
+		baseWrapper(ReagentsAPI, handlerContext, middleware.Unrestricted),
 	)
 	router.POST(
 		"/api/v1/reagents",
-		baseWrapper(ReagentCreateAPI, handlerContext, true, middleware.AssistantOnly),
+		baseWrapper(ReagentCreateAPI, handlerContext, middleware.AssistantOnlyAPI),
 	)
 	return router
 }

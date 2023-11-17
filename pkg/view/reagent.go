@@ -8,9 +8,11 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"github.com/julienschmidt/httprouter"
+	"golang.org/x/net/xsrftoken"
 
 	"github.com/Kelvedler/ChemicalStorage/pkg/common"
 	"github.com/Kelvedler/ChemicalStorage/pkg/db"
+	"github.com/Kelvedler/ChemicalStorage/pkg/env"
 )
 
 type reagentsData struct {
@@ -39,11 +41,20 @@ type reagentData struct {
 }
 
 type reagentNewData struct {
-	Caller     db.StorageUser
-	Name       string
-	Formula    string
-	NameErr    string
-	FormulaErr string
+	Caller          db.StorageUser
+	Name            string
+	Formula         string
+	NameErr         string
+	FormulaErr      string
+	ReagentPostXsrf string
+}
+
+func getReagentPostXsrf(userID string) string {
+	return xsrftoken.Generate(
+		env.Env.SecretKey,
+		userID,
+		"/api/v1/reagents",
+	)
 }
 
 func Reagents(
@@ -118,7 +129,8 @@ func ReagentCreate(
 	)
 	storageUser, _ := db.StorageUserGetByID(r.Context(), rc.dbpool, rc.userID)
 	data := reagentNewData{
-		Caller: storageUser,
+		Caller:          storageUser,
+		ReagentPostXsrf: getReagentPostXsrf(rc.userID),
 	}
 	tmpl.Execute(w, data)
 }
@@ -181,6 +193,13 @@ func sanitizeReagent(rc *RequestContext, reagent *db.Reagent) {
 	reagent.Formula = sanitizer.Sanitize(reagent.Formula)
 }
 
+func reagentErrMapAddInput(errMap map[string]string, reagent db.Reagent, userID string) {
+	reagentPostXsrf := getReagentPostXsrf(userID)
+	errMap["Formula"] = reagent.Formula
+	errMap["Name"] = reagent.Name
+	errMap["ReagentPostXsrf"] = reagentPostXsrf
+}
+
 func ReagentCreateAPI(
 	rc *RequestContext,
 	w http.ResponseWriter,
@@ -204,8 +223,7 @@ func ReagentCreateAPI(
 		err = common.LocalizeValidationErrors(err.(validator.ValidationErrors), reagent)
 		rc.logger.Info(err.Error())
 		errMap := err.(common.ValidationError).Map()
-		errMap["Formula"] = reagent.Formula
-		errMap["Name"] = reagent.Name
+		reagentErrMapAddInput(errMap, reagent, rc.userID)
 		tmpl.Execute(w, errMap)
 		return
 	}
@@ -217,8 +235,7 @@ func ReagentCreateAPI(
 			err = errStruct.(db.UniqueViolation).LocalizeUniqueViolation(db.Reagent{})
 			rc.logger.Info(err.Error())
 			errMap := err.(db.DBError).Map()
-			errMap["Formula"] = reagent.Formula
-			errMap["Name"] = reagent.Name
+			reagentErrMapAddInput(errMap, reagent, rc.userID)
 			tmpl.Execute(w, errMap)
 			return
 		default:
