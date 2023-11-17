@@ -55,8 +55,8 @@ jobs:
         if: ${{ inputs.tag }} != 'deploy-services'
         uses: docker/login-action@v2
         with:
-          username: ${{ secrets.CHEMICAL_STORAGE_REGISTRY_USER }}
-          password: ${{ secrets.CHEMICAL_STORAGE_REGISTRY_PASS }}
+          username: ${{ secrets.REGISTRY_USER }}
+          password: ${{ secrets.REGISTRY_PASS }}
 
       - name: Build and push image
         if: ${{ inputs.tag }} != 'deploy-services'
