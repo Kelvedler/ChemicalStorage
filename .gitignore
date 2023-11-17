@@ -3,4 +3,5 @@ tailwindcss
 chemical_storage
 create_admin
 .sqllsrc.json
+infra/.docker_main_env
 
