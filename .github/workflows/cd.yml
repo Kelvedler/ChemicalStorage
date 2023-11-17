@@ -21,6 +21,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: ${{ inputs.branch || github.base_ref || github.ref_name }}
     env:
       APP_SECRET_KEY: ${{ secrets.APP_SECRET_KEY }}
       DATABASE_USER: ${{ secrets.DATABASE_USER }}
