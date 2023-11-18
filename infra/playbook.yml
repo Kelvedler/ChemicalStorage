@@ -44,13 +44,13 @@
         mode: '440'
       tags: ["deploy", "deploy-services"]
 
-    - name: Pull app server image update
-      ansible.builtin.command: docker pull {{ docker_image_app_server }}:{{ docker_image_tag_app_server }}
+    - name: Pull app image update
+      ansible.builtin.command: docker pull {{ docker_image_app }}:{{ docker_image_tag_app }}
       changed_when: true
       tags: ["deploy", "deploy-app"]
 
-    - name: Start/Update app server compose
-      ansible.builtin.command: docker-compose -p {{ compose_project_name }} -f {{ project_path }}/docker-compose-app-server.yml up --force-recreate -d
+    - name: Start/Update app compose
+      ansible.builtin.command: docker-compose -p {{ compose_project_name }} -f {{ project_path }}/docker-compose-app.yml up --force-recreate -d
       changed_when: true
       tags: ["deploy", "deploy-app"]
 
