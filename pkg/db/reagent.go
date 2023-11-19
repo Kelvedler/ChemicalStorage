@@ -2,9 +2,11 @@ package db
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -94,6 +96,25 @@ func ReagentGet(
 	err = dbpool.QueryRow(ctx, query, id).
 		Scan(&reagent.ID, &reagent.CreatedAt, &reagent.UpdatedAt, &reagent.Name, &reagent.Formula)
 	return reagent, err
+}
+
+func (updateData Reagent) ReagentUpdate(
+	ctx context.Context,
+	dbpool *pgxpool.Pool,
+) error {
+	query := "UPDATE reagent SET name=$2, formula=$3 WHERE id=$1"
+	result, err := dbpool.Exec(ctx, query, updateData.ID, updateData.Name, updateData.Formula)
+	affectedRows := result.RowsAffected()
+	if err != nil {
+		return err
+	} else if affectedRows != 1 {
+		if affectedRows == 0 {
+			return pgx.ErrNoRows
+		} else {
+			panic(fmt.Sprintf("Update affected more than one row - %d", affectedRows))
+		}
+	}
+	return nil
 }
 
 type ReagentInstanceFull struct {

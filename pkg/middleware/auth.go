@@ -18,7 +18,7 @@ func PerformAuth(
 	w http.ResponseWriter,
 	r *http.Request,
 	required bool,
-) (userID, userRole string, returnErr error) {
+) (userID string, userRole db.Role, returnErr error) {
 	accessToken, err := r.Cookie("access")
 	if required {
 		returnErr = errors.New("Unauthorized")
@@ -33,7 +33,10 @@ func PerformAuth(
 	}
 
 	userID = tokenClaims[auth.ClaimSubject].(string)
-	userRole = tokenClaims[auth.ClaimAccessRights].(string)
+	userRole, err = db.StringToRole(tokenClaims[auth.ClaimAccessRights].(string))
+	if err != nil {
+		return "", db.Role{}, err
+	}
 	if auth.RenewalAllowed(int64(tokenClaims[auth.ClaimIssuedAt].(float64))) {
 		auth.ReissueTokenCookie(w, tokenClaims)
 		return userID, userRole, nil
@@ -43,9 +46,9 @@ func PerformAuth(
 	if err == nil {
 		if storageUser.Active {
 			auth.SetNewTokenCookie(w, storageUser)
-			return userID, storageUser.Role.Name, nil
+			return userID, storageUser.Role, nil
 		} else {
-			return "", "", returnErr
+			return "", db.Role{}, returnErr
 		}
 	}
 
@@ -53,10 +56,10 @@ func PerformAuth(
 	switch errStruct.(type) {
 	case db.InvalidUUID, db.DoesNotExist:
 		logger.Info("Not found")
-		return "", "", returnErr
+		return "", db.Role{}, returnErr
 	case db.ContextCanceled:
 		logger.Warn("Context canceled")
-		return "", "", returnErr
+		return "", db.Role{}, returnErr
 	default:
 		panic(fmt.Sprintf("unexpected err type, %t", errStruct))
 	}

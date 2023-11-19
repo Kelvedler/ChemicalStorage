@@ -117,7 +117,7 @@ func (newStorageUser *StorageUser) StorageUserCreate(
 	dbpool *pgxpool.Pool,
 ) error {
 	query := "INSERT into storage_user(name, password, role) VALUES($1, $2, $3) RETURNING id, created_at, updated_at, active"
-	err := dbpool.QueryRow(
+	return dbpool.QueryRow(
 		ctx,
 		query,
 		newStorageUser.Name,
@@ -129,7 +129,6 @@ func (newStorageUser *StorageUser) StorageUserCreate(
 		&newStorageUser.UpdatedAt,
 		&newStorageUser.Active,
 	)
-	return err
 }
 
 func storageUserGetSlice(

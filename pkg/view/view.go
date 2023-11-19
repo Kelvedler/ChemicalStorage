@@ -12,6 +12,7 @@ import (
 	"github.com/microcosm-cc/bluemonday"
 
 	"github.com/Kelvedler/ChemicalStorage/pkg/common"
+	"github.com/Kelvedler/ChemicalStorage/pkg/db"
 	"github.com/Kelvedler/ChemicalStorage/pkg/env"
 	"github.com/Kelvedler/ChemicalStorage/pkg/middleware"
 )
@@ -37,6 +38,7 @@ func newHandlerContext(
 type RequestContext struct {
 	logger   *slog.Logger
 	userID   string
+	userRole db.Role
 	dbpool   *pgxpool.Pool
 	sanitize *bluemonday.Policy
 	validate *validator.Validate
@@ -58,7 +60,7 @@ func baseWrapper(
 			return
 		}
 		var userID string
-		var userRole string
+		var userRole db.Role
 		var err error
 		if !settings.AuthExempt {
 			userID, userRole, err = middleware.PerformAuth(
@@ -91,6 +93,7 @@ func baseWrapper(
 		rc := &RequestContext{
 			logger:   logger,
 			userID:   userID,
+			userRole: userRole,
 			dbpool:   handlerContext.dbpool,
 			sanitize: handlerContext.sanitize,
 			validate: handlerContext.validate,
@@ -152,6 +155,18 @@ func BaseRouter(
 	router.GET(
 		"/api/v1/reagents/",
 		baseWrapper(ReagentsAPI, handlerContext, middleware.Unrestricted),
+	)
+	router.PUT(
+		"/api/v1/reagents/:id",
+		baseWrapper(ReagentPutAPI, handlerContext, middleware.AssistantOnlyAPI),
+	)
+	router.POST(
+		"/api/v1/reagents/:id/form/edit",
+		baseWrapper(ReagentEditFormAPI, handlerContext, middleware.AssistantOnlyNoXsrf),
+	)
+	router.GET(
+		"/api/v1/reagents/:id/form/read",
+		baseWrapper(ReagentReadFormAPI, handlerContext, middleware.Unrestricted),
 	)
 	router.POST(
 		"/api/v1/reagents",

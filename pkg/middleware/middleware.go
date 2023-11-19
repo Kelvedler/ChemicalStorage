@@ -44,6 +44,13 @@ var AssistantOnlyAPI = Settings{
 	XsrfExempt:   false,
 }
 
+var AssistantOnlyNoXsrf = Settings{
+	AuthRequired: true,
+	AuthExempt:   false,
+	AllowedRoles: AssistantOnly,
+	XsrfExempt:   true,
+}
+
 var AdminOnlyAPI = Settings{
 	AuthRequired: true,
 	AuthExempt:   false,

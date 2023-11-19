@@ -85,13 +85,13 @@ func User(
 	r *http.Request,
 	params httprouter.Params,
 ) {
-	user_id := params.ByName("id")
-	if user_id == rc.userID {
+	userID := params.ByName("id")
+	if userID == rc.userID {
 		rc.logger.Info("Cannot view self")
 		common.ErrorResp(w, common.Forbidden)
 		return
 	}
-	storageUser, err := db.StorageUserGetByID(r.Context(), rc.dbpool, user_id)
+	storageUser, err := db.StorageUserGetByID(r.Context(), rc.dbpool, userID)
 	if err != nil {
 		errStruct := db.ErrorAsStruct(err)
 		switch errStruct.(type) {
@@ -109,7 +109,7 @@ func User(
 	userPutXsrf := xsrftoken.Generate(
 		env.Env.SecretKey,
 		caller.ID.String(),
-		fmt.Sprintf("/api/v1/users/%s", user_id),
+		fmt.Sprintf("/api/v1/users/%s", userID),
 	)
 	data := userByIDData{
 		Caller:      caller,

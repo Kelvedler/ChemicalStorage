@@ -1,12 +1,9 @@
 {{template "base" .}}
-{{define "title"}}{{.Reagent.Name}}{{end}}
+{{define "title"}}{{.Name}}{{end}}
 {{define "content"}}
   <div class="flex justify-center">
-    <div class="flex bg-yellow mt-2 rounded-md w-1/2">
-      <ul class="list-none">
-        <div class="pl-8 pr-8 pt-3 text-left">{{.Reagent.Name}}</div>
-        <div class="pl-8 pr-8 pb-3 text-left">{{.Reagent.Formula}}</div>
-      </ul>
+    <div class='bg-{{if eq .Caller.Role.Name "assistant"}}gray-light{{else}}yellow{{end}} p-8 mt-8 rounded-md w-1/2'>
+      {{template "reagent" .}}
     </div>
   </div>
 {{end}}

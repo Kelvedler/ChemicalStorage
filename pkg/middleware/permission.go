@@ -13,9 +13,9 @@ var (
 	AdminOnly      = []db.Role{db.Admin}
 )
 
-func CheckPermission(userRole string, allowedRoles []db.Role) error {
+func CheckPermission(userRole db.Role, allowedRoles []db.Role) error {
 	for _, allowedRole := range allowedRoles {
-		if userRole == allowedRole.Name {
+		if userRole == allowedRole {
 			return nil
 		}
 	}
