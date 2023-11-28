@@ -65,19 +65,17 @@ func SignInAPI(
 		tmpl.Execute(w, errMap)
 		return
 	}
-	storageUser, err := db.StorageUserGetByName(
-		r.Context(),
-		rc.dbpool,
-		storageUserInput.Name,
-	)
-	if err != nil {
-		errStruct := db.ErrorAsStruct(err)
+	storageUser := db.StorageUser{Name: storageUserInput.Name}
+	errs := db.PerformBatch(r.Context(), rc.dbpool, []db.BatchSet{storageUser.GetByName})
+	userErr := errs[0]
+	if userErr != nil {
+		errStruct := db.ErrorAsStruct(userErr)
 		switch errStruct.(type) {
 		case db.DoesNotExist:
 			rc.logger.Info("Not found")
 			tmpl.Execute(w, errMap)
 		default:
-			rc.logger.Error(err.Error())
+			rc.logger.Error(userErr.Error())
 			common.ErrorResp(w, common.Internal)
 		}
 		return

@@ -19,9 +19,10 @@ func Index(
 	r *http.Request,
 	_ httprouter.Params,
 ) {
-	storageUser, _ := db.StorageUserGetByID(r.Context(), rc.dbpool, rc.userID)
+	caller := db.StorageUser{ID: rc.userID}
+	_ = db.PerformBatch(r.Context(), rc.dbpool, []db.BatchSet{caller.GetByID})
 	data := CallerData{
-		Caller: storageUser,
+		Caller: caller,
 	}
 	tmpl := template.Must(template.ParseFiles("templates/index.html", "templates/base.html"))
 	tmpl.Execute(w, data)

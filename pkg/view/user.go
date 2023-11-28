@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/google/uuid"
 	"github.com/julienschmidt/httprouter"
 	"golang.org/x/net/xsrftoken"
 
@@ -23,20 +24,15 @@ type storageUsersData struct {
 	Caller            db.StorageUser
 }
 
-func newStorageUsersData(
-	storageUsersSlice []db.StorageUser,
-	src string,
-	offset int,
-) (data storageUsersData) {
+func (s *storageUsersData) set(storageUsersSlice []db.StorageUser, src string, offset int) {
 	if len(storageUsersSlice) > 1 {
-		data.StorageUsersSlice = storageUsersSlice[:len(storageUsersSlice)-1]
-		data.LastStorageUser = storageUsersSlice[len(storageUsersSlice)-1]
-		data.NextOffset = offset + len(storageUsersSlice)
-		data.Src = src
+		s.StorageUsersSlice = storageUsersSlice[:len(storageUsersSlice)-1]
+		s.LastStorageUser = storageUsersSlice[len(storageUsersSlice)-1]
+		s.NextOffset = offset + len(storageUsersSlice)
+		s.Src = src
 	} else {
-		data.StorageUsersSlice = storageUsersSlice
+		s.StorageUsersSlice = storageUsersSlice
 	}
-	return data
 }
 
 func Users(
@@ -47,22 +43,26 @@ func Users(
 ) {
 	offset := 0
 	src := ""
-	storageUsersSlice, err := db.StorageUserGetRange(
+	storageUsersRange := db.StorageUsersRange{
+		Limit:     20,
+		Offset:    offset,
+		Src:       src,
+		ExcludeID: rc.userID,
+	}
+	caller := db.StorageUser{ID: rc.userID}
+	errs := db.PerformBatch(
 		r.Context(),
 		rc.dbpool,
-		20,
-		offset,
-		src,
-		rc.userID,
+		[]db.BatchSet{storageUsersRange.Get, caller.GetByID},
 	)
-	if err != nil {
-		rc.logger.Error(err.Error())
+	storageUsersErr := errs[0]
+	if storageUsersErr != nil {
+		rc.logger.Error(storageUsersErr.Error())
 		common.ErrorResp(w, common.Internal)
 		return
 	}
-	data := newStorageUsersData(storageUsersSlice, src, offset)
-	storageUser, _ := db.StorageUserGetByID(r.Context(), rc.dbpool, rc.userID)
-	data.Caller = storageUser
+	data := storageUsersData{Caller: caller}
+	data.set(storageUsersRange.StorageUsers, src, offset)
 	tmpl := template.Must(
 		template.ParseFiles(
 			"templates/users.html",
@@ -85,27 +85,37 @@ func User(
 	r *http.Request,
 	params httprouter.Params,
 ) {
-	userID := params.ByName("id")
+	userID, err := uuid.Parse(params.ByName("userID"))
+	if err != nil {
+		rc.logger.Info("Invalid UUID")
+		common.ErrorResp(w, common.NotFound)
+	}
 	if userID == rc.userID {
 		rc.logger.Info("Cannot view self")
 		common.ErrorResp(w, common.Forbidden)
 		return
 	}
-	storageUser, err := db.StorageUserGetByID(r.Context(), rc.dbpool, userID)
-	if err != nil {
-		errStruct := db.ErrorAsStruct(err)
+	storageUser := db.StorageUser{ID: userID}
+	caller := db.StorageUser{ID: rc.userID}
+	errs := db.PerformBatch(
+		r.Context(),
+		rc.dbpool,
+		[]db.BatchSet{storageUser.GetByID, caller.GetByID},
+	)
+	storageUserErr := errs[0]
+	if storageUserErr != nil {
+		errStruct := db.ErrorAsStruct(storageUserErr)
 		switch errStruct.(type) {
 		case db.InvalidUUID, db.DoesNotExist:
 			rc.logger.Info("Not found")
 			common.ErrorResp(w, common.NotFound)
 			return
 		default:
-			rc.logger.Error(err.Error())
+			rc.logger.Error(storageUserErr.Error())
 			common.ErrorResp(w, common.Internal)
 			return
 		}
 	}
-	caller, _ := db.StorageUserGetByID(r.Context(), rc.dbpool, rc.userID)
 	userPutXsrf := xsrftoken.Generate(
 		env.Env.SecretKey,
 		caller.ID.String(),
@@ -151,25 +161,26 @@ func UsersAPI(
 	if err != nil {
 		err = common.LocalizeValidationErrors(err.(validator.ValidationErrors), srcForm)
 		rc.logger.Info(err.Error())
-		w.WriteHeader(400)
 		return
 	}
-	storageUsersSlice, err := db.StorageUserGetRange(
+	storageUsersRange := db.StorageUsersRange{
+		Limit:     20,
+		Offset:    offset,
+		Src:       srcForm.Src,
+		ExcludeID: rc.userID,
+	}
+	caller := db.StorageUser{ID: rc.userID}
+	errs := db.PerformBatch(
 		r.Context(),
 		rc.dbpool,
-		20,
-		offset,
-		srcForm.Src,
-		rc.userID,
+		[]db.BatchSet{storageUsersRange.Get, caller.GetByID},
 	)
-	if err != nil {
-		rc.logger.Error(err.Error())
-		w.WriteHeader(400)
+	if errs[0] != nil {
+		rc.logger.Error(errs[0].Error())
 		return
 	}
-	data := newStorageUsersData(storageUsersSlice, src, offset)
-	storageUser, _ := db.StorageUserGetByID(r.Context(), rc.dbpool, rc.userID)
-	data.Caller = storageUser
+	data := storageUsersData{Caller: caller}
+	data.set(storageUsersRange.StorageUsers, src, offset)
 	tmpl := template.Must(
 		template.ParseFiles(
 			"templates/users.html",
@@ -192,17 +203,16 @@ func UserPutAPI(
 		common.ErrorResp(w, common.Internal)
 		return
 	}
-	userInput.ID = params.ByName("id")
-	if userInput.ID == rc.userID {
+	userInput.ID = params.ByName("userID")
+	if userInput.ID == rc.userID.String() {
 		rc.logger.Info("Cannot update self")
 		common.ErrorResp(w, common.Forbidden)
 		return
 	}
-	user, err := userInput.StorageUserBind()
+	user, err := userInput.Bind()
 	if err != nil {
 		rc.logger.Error(err.Error())
 		common.ErrorResp(w, common.Internal)
-		w.WriteHeader(400)
 		return
 	}
 	if user.Role == db.Admin {
@@ -214,22 +224,20 @@ func UserPutAPI(
 	if err != nil {
 		err = common.LocalizeValidationErrors(err.(validator.ValidationErrors), user)
 		rc.logger.Info(err.Error())
-		w.WriteHeader(400)
 		return
 	}
-	err = db.StorageUserUpdate(r.Context(), rc.dbpool, user)
-	if err != nil {
-		errStruct := db.ErrorAsStruct(err)
+	errs := db.PerformBatch(r.Context(), rc.dbpool, []db.BatchSet{user.Update})
+	userErr := errs[0]
+	if userErr != nil {
+		errStruct := db.ErrorAsStruct(userErr)
 		switch errStruct.(type) {
 		case db.InvalidUUID, db.DoesNotExist:
 			rc.logger.Info("Not found")
 			common.ErrorResp(w, common.NotFound)
-			w.WriteHeader(400)
 			return
 		default:
-			rc.logger.Error(err.Error())
+			rc.logger.Error(userErr.Error())
 			common.ErrorResp(w, common.Internal)
-			w.WriteHeader(500)
 			return
 		}
 	}

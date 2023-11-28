@@ -7,7 +7,7 @@
       Реагенти
     </button>
     {{if eq .Caller.Role.Name "assistant"}}
-      <button class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold w-1/6 py-4 rounded">
+      <button onclick="window.location.href='/storages/';" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold w-1/6 py-4 rounded">
         Склади
       </button>
     {{else if eq .Caller.Role.Name "admin"}}

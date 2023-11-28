@@ -1,0 +1,38 @@
+{{block "storages-bar" .}}
+  <div class="flex justify-between bg-gray-light">
+    <div class="flex w-1/6">
+      <button onClick="window.location.href='/storage-new';" class="bg-gray-light hover:bg-gray hover:text-white text-xl font-serif font-bold w-full py-4 rounded">
+        Створити
+      </button>
+    </div>
+  </div>
+{{end}}
+
+{{block "storage-form" .}}
+  <div id="storage-form" class="grid grid-cols-10 gap-0">
+    <div class="text-center text-xl font-serif flex justify-center items-center col-span-2">Назва</div>
+    <input type="text" name="name" value='{{.Name}}' maxlength="100" class="col-span-8 rounded-md border-2 border-{{if .NameErr}}red{{else}}gray{{end}}"/>
+    <div class="h-9 min-h-full col-span-2"></div>
+    <div class="col-span-8 py-1">{{.NameErr}}</div>
+    <div class="text-center text-xl font-serif flex justify-center items-center col-span-3">Кількість відділів</div>
+    <input onkeypress="return (event.charCode !=8 && event.charCode ==0 || (event.charCode >= 48 && event.charCode <= 57))" type="number" name="cells" min=1 max=1000 value='{{.Cells}}' class="col-span-2 rounded-md border-2 border-{{if .CellsErr}}red{{else}}gray{{end}}"/>
+    <div class="col-span-5"></div>
+    <div class="h-9 min-h-full col-span-3"></div>
+    <div class="col-span-7 py-1">{{.CellsErr}}</div>
+  </div>
+{{end}}
+
+{{block "storages-search" .}}
+  <div id="search-results" >
+    {{range .StoragesSlice}}
+      <button onClick="window.location.href='/storages/{{.ID}}';" class="flex bg-yellow mt-2 rounded-md shadow-lg shadow-gray w-full">
+        <div class="px-8 py-3 text-left">{{.Name}}</div>
+      </button>
+    {{end}}
+    {{if .NextOffset}}
+      <button onClick="window.location.href='/storages/{{.LastStorage.ID}}';" hx-get="/api/v1/storages/?src={{.Src}}&offset={{.NextOffset}}" hx-trigger="revealed" hx-swap="afterend" class="flex bg-yellow mt-2 rounded-md shadow-lg shadow-gray w-full">
+        <div class="px-8 py-3 text-left">{{.LastStorage.Name}}</div>
+      </button>
+    {{end}}
+  </div>
+{{end}}

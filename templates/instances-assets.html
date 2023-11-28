@@ -1,0 +1,48 @@
+{{block "instances-search" .}}
+  <div id="search-results">
+    {{range .InstancesSlice}}
+      <button onClick="window.location.href='/reagents/{{.Reagent}}/instances/{{.ID}}';" class="flex bg-yellow mt-2 rounded-md shadow-lg shadow-gray w-full">
+        <ul class="list-none">
+          <div class="pl-8 pr-8 pt-3 text-left">{{.Used}}</div>
+          <div class="pl-8 pr-8 pb-3 text-left">{{.ExpiresAt}}</div>
+        </ul>
+      </button>
+    {{end}}
+    {{if .NextOffset}}
+      <button onClick="window.location.href='/reagents/{{.LastInstance.Reagent}}/instances/{{.LastInstance.ID}}';" hx-get="/api/v1/reagents/{{.LastInstance.Reagent}}/instances/?offset={{.NextOffset}}" hx-trigger="revealed" hx-swap="afterend" class="flex bg-yellow mt-2 rounded-md shadow-lg shadow-gray w-full">
+        <ul class="list-none">
+          <div class="pl-8 pr-8 pt-3 text-left">{{.LastInstance.Used}}</div>
+          <div class="pl-8 pr-8 pb-3 text-left">{{.LastInstance.ExpiresAt}}</div>
+        </ul>
+      </button>
+    {{end}}
+  </div>
+{{end}}
+
+{{block "instance-form" .}}
+  <div id="instance-form" class="grid grid-cols-10 gap-0">
+    <div class="text-xl font-serif flex justify-left items-center col-span-5">Термін придатності</div>
+    <input type="date" name="expires_at" class="col-span-4 rounded-md border-2 border-{{if .ExpiresAtErr}}red{{else}}gray{{end}}"/>
+    <div></div>
+    <div class="h-9 min-h-full col-span-5"></div>
+    <div class="col-span-5 py-1">{{.ExpiresAtErr}}</div>
+    <div class="text-xl py-1 mb-4 font-serif flex justify-left items-center col-span-3">Склад</div>
+    <select id="storage-select" onchange='document.getElementById("cell-tip").innerText = JSON.parse(this.value)["cells"]' class="mb-4 bg-gray-light rounded-lg w-full col-span-6" name="storage">
+    {{range .StoragesSlice}}
+    <option value='{"id":"{{.ID}}", "cells":"{{.Cells}}"}'>{{.Name}}</option>
+    {{end}}
+    </select>
+    <div></div>
+    <div class="text-xl font-serif flex justify-left items-center col-span-2">Відділ</div>
+    <input type="number" name="cell" class="col-span-2 rounded-md border-2 border-{{if .CellErr}}red{{else}}gray{{end}}"/>
+    <div class="flex py-2 col-span-6">
+      <div class="ml-4 mr-2">Кількість відділів на складі:</div>
+      <div id="cell-tip"></div>
+    </div>
+    <script type="text/javascript">document.getElementById("cell-tip").innerText = JSON.parse(document.getElementById("storage-select").value)["cells"]</script>
+    <div class="h-9 min-h-full col-span-3"></div>
+    <div class="col-span-7 py-1">{{.CellErr}}</div>
+    <div></div>
+  </div>
+{{end}}
+

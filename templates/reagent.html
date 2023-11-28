@@ -2,8 +2,11 @@
 {{define "title"}}{{.Name}}{{end}}
 {{define "content"}}
   <div class="flex justify-center">
-    <div class='bg-{{if eq .Caller.Role.Name "assistant"}}gray-light{{else}}yellow{{end}} p-8 mt-8 rounded-md w-1/2'>
-      {{template "reagent" .}}
+    <div class="grid grid-cols-1 w-1/2">
+      <div class='bg-{{if eq .Caller.Role.Name "assistant"}}gray-light{{else}}yellow{{end}} my-8 p-8 rounded-md'>
+        {{template "reagent" .}}
+      </div>
+        {{template "instances-search" .}}
     </div>
   </div>
 {{end}}

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Kelvedler/ChemicalStorage/pkg/auth"
@@ -18,7 +19,7 @@ func PerformAuth(
 	w http.ResponseWriter,
 	r *http.Request,
 	required bool,
-) (userID string, userRole db.Role, returnErr error) {
+) (userID uuid.UUID, userRole db.Role, returnErr error) {
 	accessToken, err := r.Cookie("access")
 	if required {
 		returnErr = errors.New("Unauthorized")
@@ -32,34 +33,41 @@ func PerformAuth(
 		return userID, userRole, returnErr
 	}
 
-	userID = tokenClaims[auth.ClaimSubject].(string)
+	userIDStr := tokenClaims[auth.ClaimSubject].(string)
 	userRole, err = db.StringToRole(tokenClaims[auth.ClaimAccessRights].(string))
 	if err != nil {
-		return "", db.Role{}, err
+		return uuid.Nil, db.Role{}, err
 	}
 	if auth.RenewalAllowed(int64(tokenClaims[auth.ClaimIssuedAt].(float64))) {
 		auth.ReissueTokenCookie(w, tokenClaims)
 		return userID, userRole, nil
 	}
 
-	storageUser, err := db.StorageUserGetByID(r.Context(), dbpool, userID)
-	if err == nil {
-		if storageUser.Active {
-			auth.SetNewTokenCookie(w, storageUser)
-			return userID, storageUser.Role, nil
+	userID, err = uuid.Parse(userIDStr)
+	if err != nil {
+		return uuid.Nil, db.Role{}, returnErr
+	}
+
+	caller := db.StorageUser{ID: userID}
+	errs := db.PerformBatch(r.Context(), dbpool, []db.BatchSet{caller.GetByID})
+	userErr := errs[0]
+	if userErr == nil {
+		if caller.Active {
+			auth.SetNewTokenCookie(w, caller)
+			return userID, caller.Role, nil
 		} else {
-			return "", db.Role{}, returnErr
+			return uuid.Nil, db.Role{}, returnErr
 		}
 	}
 
-	errStruct := db.ErrorAsStruct(err)
+	errStruct := db.ErrorAsStruct(userErr)
 	switch errStruct.(type) {
-	case db.InvalidUUID, db.DoesNotExist:
+	case db.DoesNotExist:
 		logger.Info("Not found")
-		return "", db.Role{}, returnErr
+		return uuid.Nil, db.Role{}, returnErr
 	case db.ContextCanceled:
 		logger.Warn("Context canceled")
-		return "", db.Role{}, returnErr
+		return uuid.Nil, db.Role{}, returnErr
 	default:
 		panic(fmt.Sprintf("unexpected err type, %t", errStruct))
 	}

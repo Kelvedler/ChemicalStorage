@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/julienschmidt/httprouter"
 	"github.com/microcosm-cc/bluemonday"
@@ -37,7 +38,7 @@ func newHandlerContext(
 
 type RequestContext struct {
 	logger   *slog.Logger
-	userID   string
+	userID   uuid.UUID
 	userRole db.Role
 	dbpool   *pgxpool.Pool
 	sanitize *bluemonday.Policy
@@ -59,7 +60,7 @@ func baseWrapper(
 			logger.Info(fmt.Sprintf("Host %s not allowed", r.Host))
 			return
 		}
-		var userID string
+		var userID uuid.UUID
 		var userRole db.Role
 		var err error
 		if !settings.AuthExempt {
@@ -127,13 +128,29 @@ func BaseRouter(
 	router.GET("/sign-up", baseWrapper(SignUp, handlerContext, middleware.UnrestrictedNoAuth))
 	router.GET("/me", baseWrapper(Me, handlerContext, middleware.Unrestricted))
 	router.GET("/users/", baseWrapper(Users, handlerContext, middleware.AdminOnlyView))
-	router.GET("/users/:id", baseWrapper(User, handlerContext, middleware.AdminOnlyView))
+	router.GET("/users/:userID", baseWrapper(User, handlerContext, middleware.AdminOnlyView))
 	router.GET(
 		"/reagent-new",
 		baseWrapper(ReagentCreate, handlerContext, middleware.AssistantOnlyView),
 	)
 	router.GET("/reagents/", baseWrapper(Reagents, handlerContext, middleware.Unrestricted))
-	router.GET("/reagents/:id", baseWrapper(Reagent, handlerContext, middleware.Unrestricted))
+	router.GET(
+		"/reagents/:reagentID",
+		baseWrapper(Reagent, handlerContext, middleware.Unrestricted),
+	)
+	router.GET(
+		"/reagents/:reagentID/instance-new",
+		baseWrapper(ReagentInstanceCreate, handlerContext, middleware.AssistantOnlyView),
+	)
+	router.GET(
+		"/storage-new",
+		baseWrapper(StorageCreate, handlerContext, middleware.AssistantOnlyView),
+	)
+	router.GET("/storages/", baseWrapper(Storages, handlerContext, middleware.AssistantOnlyView))
+	router.GET(
+		"/storages/:storageID",
+		baseWrapper(Storage, handlerContext, middleware.AssistantOnlyView),
+	)
 
 	router.POST(
 		"/api/v1/sign-in",
@@ -148,7 +165,7 @@ func BaseRouter(
 		baseWrapper(SignUpAPI, handlerContext, middleware.Unrestricted),
 	)
 	router.PUT(
-		"/api/v1/users/:id",
+		"/api/v1/users/:userID",
 		baseWrapper(UserPutAPI, handlerContext, middleware.AdminOnlyAPI),
 	)
 	router.GET("/api/v1/users/", baseWrapper(UsersAPI, handlerContext, middleware.AdminOnlyAPI))
@@ -156,21 +173,33 @@ func BaseRouter(
 		"/api/v1/reagents/",
 		baseWrapper(ReagentsAPI, handlerContext, middleware.Unrestricted),
 	)
-	router.PUT(
-		"/api/v1/reagents/:id",
-		baseWrapper(ReagentPutAPI, handlerContext, middleware.AssistantOnlyAPI),
-	)
-	router.POST(
-		"/api/v1/reagents/:id/form/edit",
-		baseWrapper(ReagentEditFormAPI, handlerContext, middleware.AssistantOnlyNoXsrf),
-	)
-	router.GET(
-		"/api/v1/reagents/:id/form/read",
-		baseWrapper(ReagentReadFormAPI, handlerContext, middleware.Unrestricted),
-	)
 	router.POST(
 		"/api/v1/reagents",
 		baseWrapper(ReagentCreateAPI, handlerContext, middleware.AssistantOnlyAPI),
+	)
+	router.PUT(
+		"/api/v1/reagents/:reagentID",
+		baseWrapper(ReagentPutAPI, handlerContext, middleware.AssistantOnlyAPI),
+	)
+	router.POST(
+		"/api/v1/reagents/:reagentID/form/edit",
+		baseWrapper(ReagentEditFormAPI, handlerContext, middleware.AssistantOnlyNoXsrf),
+	)
+	router.GET(
+		"/api/v1/reagents/:reagentID/form/read",
+		baseWrapper(ReagentReadFormAPI, handlerContext, middleware.Unrestricted),
+	)
+	router.POST(
+		"/api/v1/reagents/:reagentID/instances",
+		baseWrapper(ReagentInstanceCreateAPI, handlerContext, middleware.AssistantOnlyAPI),
+	)
+	router.GET(
+		"/api/v1/storages",
+		baseWrapper(StoragesAPI, handlerContext, middleware.AssistantOnlyAPI),
+	)
+	router.POST(
+		"/api/v1/storages",
+		baseWrapper(StorageCreateAPI, handlerContext, middleware.AssistantOnlyAPI),
 	)
 	return router
 }

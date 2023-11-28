@@ -94,9 +94,10 @@ func SignUpAPI(
 		return
 	}
 	newStorageUser.Password = hashedPassword
-	err = newStorageUser.StorageUserCreate(r.Context(), rc.dbpool)
-	if err != nil {
-		errStruct := db.ErrorAsStruct(err)
+	errs := db.PerformBatch(r.Context(), rc.dbpool, []db.BatchSet{newStorageUser.Create})
+	userErr := errs[0]
+	if userErr != nil {
+		errStruct := db.ErrorAsStruct(userErr)
 		switch errStruct.(type) {
 		case db.UniqueViolation:
 			err = errStruct.(db.UniqueViolation).LocalizeUniqueViolation(newStorageUser)
@@ -106,7 +107,7 @@ func SignUpAPI(
 			tmpl.Execute(w, errMap)
 			return
 		default:
-			rc.logger.Error(err.Error())
+			rc.logger.Error(userErr.Error())
 			common.ErrorResp(w, common.Internal)
 			return
 		}
