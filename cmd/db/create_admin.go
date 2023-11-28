@@ -49,10 +49,11 @@ func main() {
 	ctx := context.Background()
 	env.InitEnv()
 	mainLogger := common.MainLogger()
-	dbpool := db.GetConnectionPool(ctx, mainLogger)
-	err = adminUser.StorageUserCreate(ctx, dbpool)
-	if err != nil {
-		fmt.Println(err)
+	dbpool := db.NewConnectionPool(ctx, mainLogger)
+	errs := db.PerformBatch(ctx, dbpool, []db.BatchSet{adminUser.Create})
+	userErr := errs[0]
+	if userErr != nil {
+		fmt.Println(userErr)
 	} else {
 		fmt.Println("Admin created successfuly")
 	}
