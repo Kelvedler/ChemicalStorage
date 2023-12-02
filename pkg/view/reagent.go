@@ -44,12 +44,12 @@ type reagentData struct {
 	FormulaErr     string
 	PostXsrf       string
 	PutXsrf        string
-	InstancesSlice []db.ReagentInstance
-	LastInstance   db.ReagentInstance
+	InstancesSlice []db.ReagentInstanceExtended
+	LastInstance   db.ReagentInstanceExtended
 	NextOffset     int
 }
 
-func (data *reagentData) addInstances(instancesSlice []db.ReagentInstance, offset int) {
+func (data *reagentData) addInstances(instancesSlice []db.ReagentInstanceExtended, offset int) {
 	if len(instancesSlice) > 1 {
 		data.InstancesSlice = instancesSlice[:len(instancesSlice)-1]
 		data.LastInstance = instancesSlice[len(instancesSlice)-1]
@@ -84,7 +84,7 @@ func Reagents(
 	src := ""
 	offset := 0
 	reagentsRange := db.ReagentsRange{
-		Limit:  20,
+		Limit:  24,
 		Offset: offset,
 		Src:    src,
 	}
@@ -163,8 +163,9 @@ func Reagent(
 		ID:      reagent.ID.String(),
 		Name:    reagent.Name,
 		Formula: reagent.Formula,
+		PutXsrf: getReagentPutXsrf(rc.userID, reagentID),
 	}
-	data.addInstances(rir.ReagentInstances, offset)
+	data.addInstances(rir.ReagentInstancesExtended, offset)
 	tmpl := template.Must(
 		template.ParseFiles(
 			"templates/reagent.html",
@@ -212,10 +213,12 @@ func ReagentsAPI(
 	offset, err := strconv.Atoi(offsetStr)
 	if err != nil {
 		rc.logger.Info(err.Error())
+		common.ErrorResp(w, common.Internal)
 		return
 	}
+	target := r.URL.Query().Get("target")
 
-	searchForm := SearchAPIForm{Src: src, Offset: offset}
+	searchForm := SearchAPIForm{Src: src, Offset: offset, Target: target}
 	err = rc.validate.Struct(searchForm)
 	if err != nil {
 		err = common.LocalizeValidationErrors(err.(validator.ValidationErrors), searchForm)
@@ -224,7 +227,7 @@ func ReagentsAPI(
 		return
 	}
 	reagentsRange := db.ReagentsRange{
-		Limit:  20,
+		Limit:  24,
 		Offset: offset,
 		Src:    searchForm.Src,
 	}
@@ -232,16 +235,22 @@ func ReagentsAPI(
 	reagentsErr := errs[0]
 	if reagentsErr != nil {
 		rc.logger.Error(reagentsErr.Error())
-		w.WriteHeader(400)
+		common.ErrorResp(w, common.Internal)
 		return
 	}
 	var data reagentsData
 	data.set(reagentsRange.Reagents, src, offset)
+	data.Caller = db.StorageUser{ID: rc.userID, Role: rc.userRole}
 	tmpl := template.Must(
 		template.ParseFiles(
 			"templates/reagents-assets.html",
 		),
-	).Lookup("reagents-search")
+	)
+	if searchForm.Target == "grid" {
+		tmpl = tmpl.Lookup("reagents-grid")
+	} else {
+		tmpl = tmpl.Lookup("reagents-search")
+	}
 	tmpl.Execute(w, data)
 }
 
@@ -249,26 +258,6 @@ func sanitizeReagent(rc *RequestContext, reagent *db.Reagent) {
 	sanitizer := rc.sanitize
 	reagent.Name = sanitizer.Sanitize(reagent.Name)
 	reagent.Formula = sanitizer.Sanitize(reagent.Formula)
-}
-
-func reagentErrMapAddInput(errMap map[string]string, reagent db.Reagent) {
-	errMap["Formula"] = reagent.Formula
-	errMap["Name"] = reagent.Name
-}
-
-func reagentPostErrMapAddInput(errMap map[string]string, reagent db.Reagent, userID uuid.UUID) {
-	reagentErrMapAddInput(errMap, reagent)
-	errMap["PostXsrf"] = getReagentPostXsrf(userID)
-}
-
-func reagentPutErrMapAddInput(
-	errMap map[string]string,
-	reagent db.Reagent,
-	userID uuid.UUID,
-	reagentID uuid.UUID,
-) {
-	reagentErrMapAddInput(errMap, reagent)
-	errMap["PutXsrf"] = getReagentPutXsrf(userID, reagentID)
 }
 
 func ReagentCreateAPI(
@@ -290,12 +279,15 @@ func ReagentCreateAPI(
 		Lookup("reagent-form")
 
 	err = rc.validate.StructPartial(reagent, "Name", "Formula")
+	var data reagentData
+	data.Caller.ID = rc.userID
 	if err != nil {
 		err = common.LocalizeValidationErrors(err.(validator.ValidationErrors), reagent)
 		rc.logger.Info(err.Error())
 		errMap := err.(common.ValidationError).Map()
-		reagentPostErrMapAddInput(errMap, reagent, rc.userID)
-		tmpl.Execute(w, errMap)
+		data.NameErr = errMap["NameErr"]
+		data.FormulaErr = errMap["FormulaErr"]
+		tmpl.Execute(w, data)
 		return
 	}
 	errs := db.PerformBatch(r.Context(), rc.dbpool, []db.BatchSet{reagent.Create})
@@ -304,11 +296,10 @@ func ReagentCreateAPI(
 		errStruct := db.ErrorAsStruct(reagentErr)
 		switch errStruct.(type) {
 		case db.UniqueViolation:
-			err = errStruct.(db.UniqueViolation).LocalizeUniqueViolation(db.Reagent{})
+			err = errStruct.(db.UniqueViolation).Localize(db.Reagent{})
 			rc.logger.Info(err.Error())
-			errMap := err.(db.DBError).Map()
-			reagentPostErrMapAddInput(errMap, reagent, rc.userID)
-			tmpl.Execute(w, errMap)
+			data.FormulaErr = err.(db.DBError).Map()["FormulaErr"]
+			tmpl.Execute(w, data)
 			return
 		default:
 			rc.logger.Error(reagentErr.Error())
@@ -343,7 +334,7 @@ func ReagentPutAPI(
 		err = common.LocalizeValidationErrors(err.(validator.ValidationErrors), reagent)
 		rc.logger.Info(err.Error())
 		errMap := err.(common.ValidationError).Map()
-		reagentPutErrMapAddInput(errMap, reagent, rc.userID, reagent.ID)
+		w.Header().Set("HX-Retarget", "#reagent-form")
 		errTmpl.Execute(w, errMap)
 		return
 	}
@@ -359,10 +350,10 @@ func ReagentPutAPI(
 		errStruct := db.ErrorAsStruct(reagentErr)
 		switch errStruct.(type) {
 		case db.UniqueViolation:
-			err = errStruct.(db.UniqueViolation).LocalizeUniqueViolation(db.Reagent{})
+			err = errStruct.(db.UniqueViolation).Localize(db.Reagent{})
 			rc.logger.Info(err.Error())
 			errMap := err.(db.DBError).Map()
-			reagentPostErrMapAddInput(errMap, reagent, rc.userID)
+			w.Header().Set("HX-Retarget", "#reagent-form")
 			errTmpl.Execute(w, errMap)
 			return
 		default:
@@ -380,84 +371,7 @@ func ReagentPutAPI(
 		ID:      reagent.ID.String(),
 		Name:    reagent.Name,
 		Formula: reagent.Formula,
-	}
-	w.Header().Set("HX-Retarget", "#reagent")
-	successTmpl.Execute(w, data)
-}
-
-func ReagentEditFormAPI(
-	rc *RequestContext,
-	w http.ResponseWriter,
-	r *http.Request,
-	params httprouter.Params,
-) {
-	var reagent db.Reagent
-	err := common.BindJSON(r, &reagent)
-	if err != nil {
-		rc.logger.Error(err.Error())
-		common.ErrorResp(w, common.Internal)
-		return
-	}
-	reagent.ID, err = uuid.Parse(params.ByName("reagentID"))
-	if err != nil {
-		rc.logger.Info("Not found")
-		common.ErrorResp(w, common.NotFound)
-		return
-	}
-
-	tmpl := template.Must(template.ParseFiles("templates/reagents-assets.html")).
-		Lookup("reagent-edit")
-	caller := db.StorageUser{
-		Role: rc.userRole,
-	}
-	data := reagentData{
-		Caller:  caller,
-		ID:      reagent.ID.String(),
-		Name:    reagent.Name,
-		Formula: reagent.Formula,
 		PutXsrf: getReagentPutXsrf(rc.userID, reagent.ID),
 	}
-	tmpl.Execute(w, data)
-}
-
-func ReagentReadFormAPI(
-	rc *RequestContext,
-	w http.ResponseWriter,
-	r *http.Request,
-	params httprouter.Params,
-) {
-	reagentID, err := uuid.Parse(params.ByName("reagentID"))
-	if err != nil {
-		rc.logger.Info("Invalid UUID")
-		common.ErrorResp(w, common.NotFound)
-		return
-	}
-	reagent := db.Reagent{ID: reagentID}
-	errs := db.PerformBatch(r.Context(), rc.dbpool, []db.BatchSet{reagent.Get})
-	reagentErr := errs[0]
-	if reagentErr != nil {
-		errStruct := db.ErrorAsStruct(reagentErr)
-		switch errStruct.(type) {
-		case db.DoesNotExist:
-			rc.logger.Info("Not found")
-			common.ErrorResp(w, common.NotFound)
-			return
-		default:
-			rc.logger.Error(reagentErr.Error())
-			common.ErrorResp(w, common.Internal)
-			return
-		}
-	}
-	tmpl := template.Must(template.ParseFiles("templates/reagents-assets.html")).
-		Lookup("reagent")
-	caller := db.StorageUser{
-		Role: rc.userRole,
-	}
-	data := reagentData{
-		Caller:  caller,
-		ID:      reagent.ID.String(),
-		Name:    reagent.Name,
-		Formula: reagent.Formula,
-	}
-	tmpl.Execute(w, data)
+	successTmpl.Execute(w, data)
 }

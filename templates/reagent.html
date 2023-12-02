@@ -1,12 +1,25 @@
 {{template "base" .}}
 {{define "title"}}{{.Name}}{{end}}
 {{define "content"}}
+  {{$isAssitstant := eq .Caller.Role.Name "assistant"}}
+  {{$isLecturer := eq .Caller.Role.Name "lecturer"}}
   <div class="flex justify-center">
-    <div class="grid grid-cols-1 w-1/2">
-      <div class='bg-{{if eq .Caller.Role.Name "assistant"}}gray-light{{else}}yellow{{end}} my-8 p-8 rounded-md'>
-        {{template "reagent" .}}
+  <div x-data="{name: '{{.Name}}', formula: '{{.Formula}}'}" class="w-3/5 bg-blue mt-8 rounded-md">
+      <div class="grid grid-cols-1">
+        <div class='bg-{{if $isAssitstant}}gray-light{{else}}yellow{{end}} p-8 rounded-md'>
+          {{template "reagent" .}}
+        </div>
+        {{if or $isAssitstant $isLecturer}}
+          <div class="mx-2 mb-2 mt-4">
+            <fieldset class="px-2 pb-2 pt-4 border-2 border-white rounded-md">
+              <legend class="text-white text-xl">В наявності</legend>
+              <div class="grid grid-cols-2 gap-4">
+                {{template "instances-search" .}}
+              </div>
+            </fieldset>
+          </div>
+        {{end}}
       </div>
-        {{template "instances-search" .}}
     </div>
   </div>
 {{end}}

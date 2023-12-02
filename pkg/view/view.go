@@ -182,14 +182,6 @@ func BaseRouter(
 		baseWrapper(ReagentPutAPI, handlerContext, middleware.AssistantOnlyAPI),
 	)
 	router.POST(
-		"/api/v1/reagents/:reagentID/form/edit",
-		baseWrapper(ReagentEditFormAPI, handlerContext, middleware.AssistantOnlyNoXsrf),
-	)
-	router.GET(
-		"/api/v1/reagents/:reagentID/form/read",
-		baseWrapper(ReagentReadFormAPI, handlerContext, middleware.Unrestricted),
-	)
-	router.POST(
 		"/api/v1/reagents/:reagentID/instances",
 		baseWrapper(ReagentInstanceCreateAPI, handlerContext, middleware.AssistantOnlyAPI),
 	)

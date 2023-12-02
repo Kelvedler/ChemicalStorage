@@ -2,7 +2,7 @@
 {{define "title"}}Новий екземпляр{{end}}
 {{define "content"}}
   <div class="flex justify-center">
-    <div class="w-1/3 p-8 mt-8 rounded-lg bg-gray-light">
+    <div x-data="{ expiresAt: '', cell: '', storages: '', selectedStorage: 0, cellTip: {{ (index .StoragesSlice 0).Cells }} }" class="w-1/3 p-8 mt-8 rounded-lg bg-gray-light">
       {{template "instance-form" .}}
       <div class="flex w-full justify-center">
         <button hx-post="/api/v1/reagents/{{.ReagentID}}/instances" hx-ext="json-enc" hx-target="#instance-form" hx-include="[name='expires_at'], [name='storage'], [name='cell']" hx-headers='{"_xsrf": "{{ .PostXsrf }}"}' hx-swap="outerHTML" hx-on="htmx:beforeRequest: event.detail.requestConfig.parameters.storage = JSON.parse(event.detail.requestConfig.parameters.storage)['id']" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold w-1/3 justify-center py-4 rounded-md">Створити</button>

@@ -24,6 +24,7 @@ type instanceData struct {
 	CellErr       string
 	StoragesSlice []db.Storage
 	PostXsrf      string
+	LoadStorages  bool
 }
 
 func getInstancePostXsrf(userID, reagentID string) string {
@@ -87,9 +88,9 @@ type reagentInstanceCreateInput struct {
 }
 
 type reagentInstanceCreate struct {
-	ExpiresAt time.Time `json:"expires_at" validate:"gt"             uaLocal:"термін придатності"`
+	ExpiresAt time.Time `json:"expires_at" validate:"gt" uaLocal:"термін придатності"`
 	Storage   uuid.UUID `json:"storage"`
-	Cell      int16     `json:"cell"       validate:"gte=1,lte=1000" uaLocal:"відділ"`
+	Cell      int16     `json:"cell"                     uaLocal:"відділ"`
 }
 
 func (input reagentInstanceCreateInput) Bind() (output reagentInstanceCreate, err error) {
@@ -134,12 +135,13 @@ func ReagentInstanceCreateAPI(
 	input, err := inputStr.Bind()
 	tmpl := template.Must(template.ParseFiles("templates/instances-assets.html")).
 		Lookup("instance-form")
+	returnData := instanceData{LoadStorages: true}
 	err = rc.validate.Struct(input)
 	if err != nil {
 		err = common.LocalizeValidationErrors(err.(validator.ValidationErrors), input)
 		rc.logger.Info(err.Error())
-		errMap := err.(common.ValidationError).Map()
-		tmpl.Execute(w, errMap)
+		returnData.ExpiresAtErr = err.(common.ValidationError).Map()["ExpiresAtErr"]
+		tmpl.Execute(w, returnData)
 		return
 	}
 	reagentID, err := uuid.Parse(params.ByName("reagentID"))
@@ -158,8 +160,8 @@ func ReagentInstanceCreateAPI(
 	}
 	reagentInstanceExtended := db.ReagentInstanceExtended{
 		ReagentInstance: reagentInstance,
-		Storage:         input.Storage,
-		CellNumber:      input.Cell,
+		Storage:         db.Storage{ID: input.Storage},
+		StorageCell:     storageCell,
 	}
 	errs := db.PerformBatch(r.Context(), rc.dbpool, []db.BatchSet{
 		storageCell.TryCreate,
@@ -167,9 +169,19 @@ func ReagentInstanceCreateAPI(
 	})
 	for _, err = range errs {
 		if err != nil {
-			rc.logger.Error(err.Error())
-			common.ErrorResp(w, common.Internal)
-			return
+			errStruct := db.ErrorAsStruct(err)
+			switch errStruct.(type) {
+			case db.OutOfLimits:
+				err = errStruct.(db.OutOfLimits).Localize(storageCell)
+				rc.logger.Info(err.Error())
+				returnData.CellErr = err.(db.DBError).Map()["NumberErr"]
+				tmpl.Execute(w, returnData)
+				return
+			default:
+				rc.logger.Error(err.Error())
+				common.ErrorResp(w, common.Internal)
+				return
+			}
 		}
 	}
 

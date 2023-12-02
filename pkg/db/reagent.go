@@ -1,6 +1,7 @@
 package db
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,6 +15,7 @@ type Reagent struct {
 	UpdatedAt time.Time `json:"updated_at"`
 	Name      string    `json:"name"       validate:"gte=3,lte=300" uaLocal:"назва"`
 	Formula   string    `json:"formula"    validate:"gte=1,lte=50"  uaLocal:"формула"`
+	Instances int       `json:"instances"`
 }
 
 type ReagentsRange struct {
@@ -41,11 +43,21 @@ func (r *Reagent) Create() (BatchOperation, BatchRead) {
 func (r ReagentsRange) getQueue(
 	batch *pgx.Batch,
 ) {
+	cols := "reagent.id, reagent.created_at, reagent.updated_at, reagent.name, reagent.formula, COUNT(reagent_instance)"
+	join := "LEFT JOIN reagent_instance ON reagent.id = reagent_instance.reagent AND reagent_instance.used IS FALSE"
+	filter := "reagent.name ILIKE $3 OR reagent.formula ILIKE $3"
+	order := "COUNT(reagent_instance) DESC, reagent.name"
 	if len(r.Src) >= 1 {
-		query := "SELECT * FROM reagent WHERE name ILIKE $3 OR formula ILIKE $3 ORDER BY name LIMIT $1 OFFSET $2"
+		query := fmt.Sprintf(
+			"SELECT %s FROM reagent %s WHERE %s GROUP BY reagent.id ORDER BY %s LIMIT $1 OFFSET $2",
+			cols,
+			join,
+			filter,
+			order,
+		)
 		batch.Queue(query, r.Limit, r.Offset, r.Src+"%")
 	} else {
-		query := "SELECT * FROM reagent ORDER BY name LIMIT $1 OFFSET $2"
+		query := fmt.Sprintf("SELECT %s FROM reagent %s GROUP BY reagent.id ORDER BY %s LIMIT $1 OFFSET $2", cols, join, order)
 		batch.Queue(query, r.Limit, r.Offset)
 	}
 }
@@ -67,6 +79,7 @@ func (r *ReagentsRange) getResult(results pgx.BatchResults) error {
 			&reagent.UpdatedAt,
 			&reagent.Name,
 			&reagent.Formula,
+			&reagent.Instances,
 		)
 		if err != nil {
 			return err
@@ -138,15 +151,15 @@ type ReagentInstance struct {
 
 type ReagentInstanceExtended struct {
 	ReagentInstance ReagentInstance
-	Storage         uuid.UUID
-	CellNumber      int16
+	Storage         Storage
+	StorageCell     StorageCell
 }
 
 type ReagentInstanceRange struct {
-	ReagentInstances []ReagentInstance
-	ReagentID        uuid.UUID
-	Limit            int
-	Offset           int
+	ReagentInstancesExtended []ReagentInstanceExtended
+	ReagentID                uuid.UUID
+	Limit                    int
+	Offset                   int
 }
 
 func (r *ReagentInstanceExtended) createQueue(
@@ -158,8 +171,8 @@ func (r *ReagentInstanceExtended) createQueue(
 		query,
 		reagentInstance.Reagent,
 		reagentInstance.ExpiresAt,
-		r.Storage,
-		r.CellNumber,
+		r.Storage.ID,
+		r.StorageCell.Number,
 	)
 }
 
@@ -178,7 +191,17 @@ func (r *ReagentInstanceExtended) Create() (BatchOperation, BatchRead) {
 func (r *ReagentInstanceRange) getQueue(
 	batch *pgx.Batch,
 ) {
-	query := "SELECT * FROM reagent_instance WHERE reagent=$1 ORDER BY created_at DESC LIMIT $2 OFFSET $3"
+	cols := "reagent_instance.id, reagent_instance.created_at, reagent_instance.updated_at, reagent_instance.reagent, reagent_instance.used, reagent_instance.used_at, reagent_instance.expires_at, reagent_instance.storage_cell, storage_cell.id, storage_cell.created_at, storage_cell.updated_at, storage_cell.storage, storage_cell.number, storage.id, storage.created_at, storage.updated_at, storage.name, storage.cells"
+	join := "LEFT JOIN storage_cell ON reagent_instance.storage_cell = storage_cell.id LEFT JOIN storage ON storage_cell.storage = storage.id "
+	filter := "reagent_instance.reagent=$1"
+	order := "reagent_instance.created_at"
+	query := fmt.Sprintf(
+		"SELECT %s FROM reagent_instance %s WHERE %s ORDER BY %s DESC LIMIT $2 OFFSET $3",
+		cols,
+		join,
+		filter,
+		order,
+	)
 	batch.Queue(query, r.ReagentID, r.Limit, r.Offset)
 }
 
@@ -192,17 +215,27 @@ func (r *ReagentInstanceRange) getResult(results pgx.BatchResults) error {
 		return nil
 	}
 	for next {
-		var reagentInstance ReagentInstance
+		var i ReagentInstanceExtended
 		var usedAtVal pgtype.TimestamptzValuer
 		err = rows.Scan(
-			&reagentInstance.ID,
-			&reagentInstance.CreatedAt,
-			&reagentInstance.UpdatedAt,
-			&reagentInstance.Reagent,
-			&reagentInstance.Used,
+			&i.ReagentInstance.ID,
+			&i.ReagentInstance.CreatedAt,
+			&i.ReagentInstance.UpdatedAt,
+			&i.ReagentInstance.Reagent,
+			&i.ReagentInstance.Used,
 			usedAtVal,
-			&reagentInstance.ExpiresAt,
-			&reagentInstance.StorageCell,
+			&i.ReagentInstance.ExpiresAt,
+			&i.ReagentInstance.StorageCell,
+			&i.StorageCell.ID,
+			&i.StorageCell.CreatedAt,
+			&i.StorageCell.UpdatedAt,
+			&i.StorageCell.Storage,
+			&i.StorageCell.Number,
+			&i.Storage.ID,
+			&i.Storage.CreatedAt,
+			&i.Storage.UpdatedAt,
+			&i.Storage.Name,
+			&i.Storage.Cells,
 		)
 		if err != nil {
 			return err
@@ -210,10 +243,10 @@ func (r *ReagentInstanceRange) getResult(results pgx.BatchResults) error {
 		if usedAtVal != nil {
 			usedAtPgxTz, err := usedAtVal.TimestamptzValue()
 			if err == nil {
-				reagentInstance.UsedAt = usedAtPgxTz.Time
+				i.ReagentInstance.UsedAt = usedAtPgxTz.Time
 			}
 		}
-		r.ReagentInstances = append(r.ReagentInstances, reagentInstance)
+		r.ReagentInstancesExtended = append(r.ReagentInstancesExtended, i)
 		next = rows.Next()
 	}
 	return nil

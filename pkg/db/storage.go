@@ -142,13 +142,13 @@ type StorageCell struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 	Storage   uuid.UUID `json:"storage"`
-	Number    int16     `json:"number"`
+	Number    int16     `json:"number"     uaLocal:"номер"`
 }
 
 func (storageCell StorageCell) tryCreateQueue(
 	batch *pgx.Batch,
 ) {
-	query := "INSERT INTO storage_cell(storage, number) VALUES($1, $2) ON CONFLICT DO NOTHING"
+	query := "INSERT INTO storage_cell(storage, number) VALUES($1, $2) ON CONFLICT ON CONSTRAINT storage_cell_storage_number_key DO NOTHING"
 	batch.Queue(query, storageCell.Storage, storageCell.Number)
 }
 

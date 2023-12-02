@@ -36,7 +36,10 @@ CREATE FUNCTION cell_number_limit() RETURNS trigger AS $cell_number_limit$
     IF NEW.number < 1 OR NEW.number > cells_max THEN
       RAISE EXCEPTION USING
         ERRCODE = 'A0001',
-        MESSAGE = 'cell number out of limits';
+        MESSAGE = 'cell number out of limits',
+        CONSTRAINT = 'storage_cell_number_limit',
+        TABLE = 'storage_cell',
+        COLUMN = 'number';
     END IF;
     RETURN NEW;
   END;
@@ -52,7 +55,10 @@ CREATE FUNCTION cell_constraint() RETURNS trigger AS $cell_constraint$
     if NEW.cells < cell_max THEN
       RAISE EXCEPTION USING
         ERRCODE = 'A0002',
-        MESSAGE = 'cell with higher number exist';
+        MESSAGE = 'cell with higher number exist',
+        CONSTRAINT = 'storage_cells_constraint',
+        TABLE = 'storage',
+        COLUMN = 'cells';
     END IF;
     RETURN NEW;
   END;

@@ -100,7 +100,7 @@ func SignUpAPI(
 		errStruct := db.ErrorAsStruct(userErr)
 		switch errStruct.(type) {
 		case db.UniqueViolation:
-			err = errStruct.(db.UniqueViolation).LocalizeUniqueViolation(newStorageUser)
+			err = errStruct.(db.UniqueViolation).Localize(newStorageUser)
 			rc.logger.Info(err.Error())
 			errMap := err.(db.DBError).Map()
 			signUpErrMapAddInput(errMap, input)

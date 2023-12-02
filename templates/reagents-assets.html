@@ -1,22 +1,37 @@
 {{block "reagents-search" .}}
-  <div id="search-results" >
-    {{range .ReagentsSlice}}
-      <button onClick="window.location.href='/reagents/{{.ID}}';" class="flex bg-yellow mt-2 rounded-md shadow-lg shadow-gray w-full">
-        <ul class="list-none">
-          <div class="pl-8 pr-8 pt-3 text-left">{{.Name}}</div>
-          <div class="pl-8 pr-8 pb-3 text-left">{{.Formula}}</div>
-        </ul>
-      </button>
-    {{end}}
-    {{if .NextOffset}}
-      <button onClick="window.location.href='/reagents/{{.LastReagent.ID}}';" hx-get="/api/v1/reagents/?src={{.Src}}&offset={{.NextOffset}}" hx-trigger="revealed" hx-swap="afterend" class="flex bg-yellow mt-2 rounded-md shadow-lg shadow-gray w-full">
-        <ul class="list-none">
-          <div class="pl-8 pr-8 pt-3 text-left">{{.LastReagent.Name}}</div>
-          <div class="pl-8 pr-8 pb-3 text-left">{{.LastReagent.Formula}}</div>
-        </ul>
-      </button>
-    {{end}}
+  <div id="search-results" class="grid grid-cols-3 gap-4 w-2/3 mt-4">
+    {{template "reagents-grid" .}}
   </div>
+{{end}}
+
+{{block "reagents-grid" .}}
+  {{$CallerIsAssistant := eq .Caller.Role.Name "assistant"}}
+  {{$CallerIsLecturer := eq .Caller.Role.Name "lecturer"}}
+  {{$AllowedRole := or $CallerIsLecturer $CallerIsAssistant}}
+  {{range .ReagentsSlice}}
+      {{$NoInStorage := eq .Instances 0}}
+      <button onClick="window.location.href='/reagents/{{.ID}}';" class="{{if and $AllowedRole $NoInStorage}}bg-yellow-light{{else}}bg-yellow{{end}} rounded-md shadow-lg shadow-gray">
+      <ul class="list-none">
+        <div class="pl-8 pr-8 py-3 text-left">{{.Name}}</div>
+        <div class="pl-8 pr-8 text-left">Формула: {{.Formula}}</div>
+        {{if $AllowedRole }}
+          <div class="pl-8 pr-8 pb-3 text-left">{{if $NoInStorage}}Немає в наявності{{else}}Кількість на складі: {{.Instances}}{{end}}</div>
+        {{end}}
+      </ul>
+    </button>
+  {{end}}
+  {{if .NextOffset}}
+    {{$NoInStorage := eq .LastReagent.Instances 0}}
+    <button onClick="window.location.href='/reagents/{{.LastReagent.ID}}';" hx-get="/api/v1/reagents/?src={{.Src}}&offset={{.NextOffset}}&target=grid" hx-trigger="revealed" hx-swap="afterend" class="bg-yellow{{if and $AllowedRole $NoInStorage}}-light{{end}} rounded-md shadow-lg shadow-gray">
+      <ul class="list-none">
+        <div class="pl-8 pr-8 py-3 text-left">{{.LastReagent.Name}}</div>
+        <div class="pl-8 pr-8 text-left">Формула: {{.LastReagent.Formula}}</div>
+        {{if $AllowedRole }}
+          <div class="pl-8 pr-8 pb-3 text-left">{{if $NoInStorage}}Немає в наявності{{else}}Кількість на складі: {{.LastReagent.Instances}}{{end}}</div>
+        {{end}}
+      </ul>
+    </button>
+  {{end}}
 {{end}}
 
 {{block "subscript-tip-popover" .}}
@@ -35,6 +50,7 @@
         </button>
       {{end}}
     </div>
+    <script src="/static/subscript-numbers.js"></script>
     <div class="flex w-1/3">
       <input onKeyUp="return subscriptNumbers(event)" type="search" name="src" placeholder="назва реагенту чи формула" maxlength="50" class="flex w-full rounded-full px-6 my-2 border-2 border-gray-dark" hx-get="/api/v1/reagents/" hx-trigger="keyup changed delay:400ms" hx-target="#search-results" hx-swap="outerHTML"/>
       <div class="flex ml-4 py-3">
@@ -48,11 +64,12 @@
 {{block "reagent-form" .}}
   <div id="reagent-form" class="grid grid-cols-10 gap-0">
     <div class="text-xl font-serif flex justify-center items-center col-span-2">Назва</div>
-    <textarea name="name" maxlength="300" rows="3" style="resize: none;" class="col-span-8 rounded-md border-2 border-{{if .NameErr}}red{{else}}gray{{end}}">{{.Name}}</textarea>
+    <textarea x-model="name" name="name" maxlength="300" rows="3" style="resize: none;" class="col-span-8 rounded-md border-2 border-{{if .NameErr}}red{{else}}gray{{end}}"></textarea>
     <div class="h-9 min-h-full col-span-2"></div>
     <div class="col-span-8 py-1">{{.NameErr}}</div>
     <div class="text-center text-xl font-serif flex justify-center items-center col-span-2">Формула</div>
-    <input onKeyUp="return subscriptNumbers(event)" type="text" name="formula" value='{{.Formula}}' maxlength="50" class="col-span-7 rounded-md border-2 border-{{if .FormulaErr}}red{{else}}gray{{end}}"/>
+    <script src="/static/subscript-numbers.js"></script>
+    <input onKeyUp="return subscriptNumbers(event)" type="text" x-model="formula" name="formula" maxlength="50" class="col-span-7 rounded-md border-2 border-{{if .FormulaErr}}red{{else}}gray{{end}}"/>
     <div class="flex ml-4 py-1">
       {{template "subscript-tip-popover" .}}
     </div>
@@ -63,29 +80,29 @@
 
 {{block "reagent-data" .}}
   <div class="grid grid-cols-10 gap-0">
-    <div class="col-span-10 text-center">{{.Name}}</div>
-    <div class="col-span-10 text-left">{{.Formula}}</div>
+    <div class="col-span-10 text-center text-xl font-bold font-serif">{{.Name}}</div>
+    <div class="col-span-10 text-left text-xl">Формула: {{.Formula}}</div>
   </div>
 {{end}}
 
 {{block "reagent" .}}
-  <div id="reagent">
-    {{template "reagent-data" .}}
-    {{ if eq .Caller.Role.Name "assistant" }}
+  <div id="reagent" x-data="{ editState: false }">
+    <div x-show="!editState">
+      {{template "reagent-data" .}}
+      {{ if eq .Caller.Role.Name "assistant" }}
+        <div class="flex w-full justify-evenly">
+          <button onClick="window.location.href='/reagents/{{.ID}}/instance-new';" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold justify-center w-1/3 py-4 mt-4 rounded-md">Додати екземпляр</button>
+          <button @click="editState = ! editState" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold justify-center w-1/3 py-4 mt-4 rounded-md">Редагувати</button>
+        </div>
+      {{end}}
+    </div>
+    <div x-show="editState">
+      {{template "reagent-form" .}}
       <div class="flex w-full justify-evenly">
-        <button onClick="window.location.href='/reagents/{{.ID}}/instance-new';" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold justify-center w-1/3 py-4 mt-4 rounded-md">Додати екземпляр</button>
-        <button hx-post="/api/v1/reagents/{{.ID}}/form/edit" hx-ext="json-enc" hx-vals='{"name": "{{.Name}}", "formula": "{{.Formula}}"}' hx-swap="outerHTML" hx-target="#reagent" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold justify-center w-1/3 py-4 mt-4 rounded-md">Редагувати</button>
+        <button hx-put="/api/v1/reagents/{{.ID}}" hx-swap="outerHTML" hx-target="#reagent" hx-ext="json-enc" hx-include="[name='name'], [name='formula']" hx-headers='{"_xsrf": "{{.PutXsrf}}"}' class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold justify-center w-1/3 py-4 mt-4 rounded-md">Зберегти</button>
+        <button @click="editState = ! editState" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold justify-center w-1/3 py-4 mt-4 rounded-md">Відміна</button>
       </div>
-    {{end}}
-  </div>
-{{end}}
-
-{{block "reagent-edit" .}}
-  <div id="reagent">
-    {{template "reagent-form" .}}
-    <div class="flex w-full justify-evenly">
-      <button hx-put="/api/v1/reagents/{{.ID}}" hx-swap="outerHTML" hx-target="#reagent-form" hx-ext="json-enc" hx-include="[name='name'], [name='formula']" hx-headers='{"_xsrf": "{{ .PutXsrf }}"}' class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold justify-center w-1/3 py-4 mt-4 rounded-md">Зберегти</button>
-      <button hx-get="/api/v1/reagents/{{.ID}}/form/read" hx-swap="outerHTML" hx-target="#reagent" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold justify-center w-1/3 py-4 mt-4 rounded-md">Відміна</button>
     </div>
   </div>
 {{end}}
+
