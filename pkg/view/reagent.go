@@ -36,26 +36,48 @@ func (data *reagentsData) set(reagentsSlice []db.Reagent, src string, offset int
 }
 
 type reagentData struct {
-	Caller         db.StorageUser
-	ID             string
-	Name           string
-	Formula        string
-	NameErr        string
-	FormulaErr     string
-	PostXsrf       string
-	PutXsrf        string
-	InstancesSlice []db.ReagentInstanceExtended
-	LastInstance   db.ReagentInstanceExtended
-	NextOffset     int
+	Caller             db.StorageUser
+	ID                 string
+	Name               string
+	Formula            string
+	NameErr            string
+	FormulaErr         string
+	PostXsrf           string
+	PutXsrf            string
+	InstancesSlice     []db.ReagentInstanceExtended
+	LastInstance       db.ReagentInstanceExtended
+	UsedInstancesSlice []db.ReagentInstanceExtended
+	LastUsedInstance   db.ReagentInstanceExtended
+	NextOffset         int
+	NextOffsetUsed     int
 }
 
-func (data *reagentData) addInstances(instancesSlice []db.ReagentInstanceExtended, offset int) {
-	if len(instancesSlice) > 1 {
-		data.InstancesSlice = instancesSlice[:len(instancesSlice)-1]
-		data.LastInstance = instancesSlice[len(instancesSlice)-1]
-		data.NextOffset = offset + len(instancesSlice)
+func (data *reagentData) addInstances(
+	instancesSlice []db.ReagentInstanceExtended,
+	offset, usedOffset int,
+) {
+	var unusedInstances []db.ReagentInstanceExtended
+	var usedInstances []db.ReagentInstanceExtended
+	for _, inst := range instancesSlice {
+		if inst.ReagentInstance.UsedAt.IsZero() {
+			unusedInstances = append(unusedInstances, inst)
+		} else {
+			usedInstances = append(usedInstances, inst)
+		}
+	}
+	if len(unusedInstances) > 1 {
+		data.InstancesSlice = unusedInstances[:len(unusedInstances)-1]
+		data.LastInstance = unusedInstances[len(unusedInstances)-1]
+		data.NextOffset = offset + len(unusedInstances)
 	} else {
-		data.InstancesSlice = instancesSlice
+		data.InstancesSlice = unusedInstances
+	}
+	if len(usedInstances) > 1 {
+		data.UsedInstancesSlice = usedInstances[:len(usedInstances)-1]
+		data.LastUsedInstance = usedInstances[len(usedInstances)-1]
+		data.NextOffsetUsed = usedOffset + len(usedInstances)
+	} else {
+		data.UsedInstancesSlice = usedInstances
 	}
 }
 
@@ -165,7 +187,7 @@ func Reagent(
 		Formula: reagent.Formula,
 		PutXsrf: getReagentPutXsrf(rc.userID, reagentID),
 	}
-	data.addInstances(rir.ReagentInstancesExtended, offset)
+	data.addInstances(rir.ReagentInstancesExtended, offset, 0)
 	tmpl := template.Must(
 		template.ParseFiles(
 			"templates/reagent.html",

@@ -143,6 +143,10 @@ func BaseRouter(
 		baseWrapper(ReagentInstanceCreate, handlerContext, middleware.AssistantOnlyView),
 	)
 	router.GET(
+		"/reagents/:reagentID/instances/:instanceID",
+		baseWrapper(ReagentInstance, handlerContext, middleware.LecturerAssistantView),
+	)
+	router.GET(
 		"/storage-new",
 		baseWrapper(StorageCreate, handlerContext, middleware.AssistantOnlyView),
 	)
@@ -184,6 +188,14 @@ func BaseRouter(
 	router.POST(
 		"/api/v1/reagents/:reagentID/instances",
 		baseWrapper(ReagentInstanceCreateAPI, handlerContext, middleware.AssistantOnlyAPI),
+	)
+	router.POST(
+		"/api/v1/reagents/:reagentID/instances/:instanceID/use",
+		baseWrapper(ReagentInstanceUseAPI, handlerContext, middleware.AssistantOnlyAPI),
+	)
+	router.POST(
+		"/api/v1/reagents/:reagentID/instances/:instanceID/transfer",
+		baseWrapper(ReagentInstanceTransferAPI, handlerContext, middleware.AssistantOnlyAPI),
 	)
 	router.GET(
 		"/api/v1/storages",

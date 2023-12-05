@@ -36,3 +36,11 @@
     {{end}}
   </div>
 {{end}}
+
+{{block "storages-select" .}}
+  <select id="storages-select" x-init="$el.selectedIndex = selectedStorage" @change="cellTip = JSON.parse($el.value)['cells']; selectedStorage = $el.selectedIndex" class="mb-4 bg-gray-light rounded-lg w-full" name="storage">
+    {{range .StoragesSlice}}
+      <option value='{"id":"{{.ID}}", "cells":"{{.Cells}}"}'>{{.Name}}</option>
+    {{end}}
+  </select>
+{{end}}

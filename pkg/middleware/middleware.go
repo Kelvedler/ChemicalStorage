@@ -23,6 +23,13 @@ var UnrestrictedNoAuth = Settings{
 	XsrfExempt:   true,
 }
 
+var LecturerAssistantView = Settings{
+	AuthRequired: true,
+	AuthExempt:   false,
+	AllowedRoles: LecturerAssistant,
+	XsrfExempt:   true,
+}
+
 var AssistantOnlyView = Settings{
 	AuthRequired: true,
 	AuthExempt:   false,

@@ -25,9 +25,7 @@ CREATE TRIGGER mdt_storage_cell
   FOR EACH ROW
   EXECUTE PROCEDURE moddatetime (updated_at);
 
-ALTER TABLE reagent_instance ALTER expires_at TYPE date;
-
-ALTER TABLE reagent_instance ADD storage_cell uuid REFERENCES storage_cell (id) ON DELETE SET NULL;
+ALTER TABLE reagent_instance ALTER expires_at TYPE date, DROP used, ADD storage_cell uuid REFERENCES storage_cell (id) ON DELETE SET NULL, ADD deleted_at timestamptz;
 
 CREATE FUNCTION cell_number_limit() RETURNS trigger AS $cell_number_limit$
   DECLARE
@@ -66,4 +64,28 @@ $cell_constraint$ LANGUAGE plpgsql;
 
 CREATE TRIGGER cell_constraint BEFORE UPDATE ON storage
   FOR EACH ROW EXECUTE FUNCTION cell_constraint();
+
+CREATE FUNCTION reagent_instance_constraint() RETURNS trigger AS $reagent_instance_constraint$
+  BEGIN
+    if OLD.used_at IS NOT NULL AND OLD.used_at != NEW.used_at THEN
+      RAISE EXCEPTION USING
+        ERRCODE = 'A0003',
+        MESSAGE = 'used_at already set',
+        CONSTRAINT = 'reagent_instance_used_at_constraint',
+        TABLE = 'reagent_instance',
+        COLUMN = 'used_at';
+    ELSIF OLD.deleted_at IS NOT NULL AND OLD.deleted_at != NEW.deleted_at THEN
+      RAISE EXCEPTION USING
+        ERRCODE = 'A0003',
+        MESSAGE = 'deleted_at already set',
+        CONSTRAINT = 'reagent_instance_deleted_at_constraint',
+        TABLE = 'reagent_instance',
+        COLUMN = 'deleted_at';
+    END IF;
+    RETURN NEW;
+  END;
+$reagent_instance_constraint$ LANGUAGE plpgsql;
+
+CREATE TRIGGER reagent_instance_constraint BEFORE UPDATE ON reagent_instance
+  FOR EACH ROW EXECUTE FUNCTION reagent_instance_constraint();
 

@@ -7,10 +7,11 @@ import (
 )
 
 var (
-	ErrorForbidden = errors.New("Request forbidden")
-	AllowAll       = []db.Role{db.Admin, db.Lecturer, db.Assistant, db.Unconfirmed}
-	AssistantOnly  = []db.Role{db.Assistant}
-	AdminOnly      = []db.Role{db.Admin}
+	ErrorForbidden    = errors.New("Request forbidden")
+	AllowAll          = []db.Role{db.Admin, db.Lecturer, db.Assistant, db.Unconfirmed}
+	LecturerAssistant = []db.Role{db.Lecturer, db.Assistant}
+	AssistantOnly     = []db.Role{db.Assistant}
+	AdminOnly         = []db.Role{db.Admin}
 )
 
 func CheckPermission(userRole db.Role, allowedRoles []db.Role) error {

@@ -44,7 +44,7 @@ func (r ReagentsRange) getQueue(
 	batch *pgx.Batch,
 ) {
 	cols := "reagent.id, reagent.created_at, reagent.updated_at, reagent.name, reagent.formula, COUNT(reagent_instance)"
-	join := "LEFT JOIN reagent_instance ON reagent.id = reagent_instance.reagent AND reagent_instance.used IS FALSE"
+	join := "LEFT JOIN reagent_instance ON reagent.id = reagent_instance.reagent AND reagent_instance.used_at IS NULL"
 	filter := "reagent.name ILIKE $3 OR reagent.formula ILIKE $3"
 	order := "COUNT(reagent_instance) DESC, reagent.name"
 	if len(r.Src) >= 1 {
@@ -143,14 +143,15 @@ type ReagentInstance struct {
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 	Reagent     uuid.UUID `json:"reagent"`
-	Used        bool      `json:"used"`
 	UsedAt      time.Time `json:"used_at"`
 	ExpiresAt   time.Time `json:"expires_at"   validate:"gt" uaLocal:"термін придатності"`
 	StorageCell uuid.UUID `json:"storage_cell"`
+	DeletedAt   time.Time `json:"deleted_at"`
 }
 
 type ReagentInstanceExtended struct {
 	ReagentInstance ReagentInstance
+	Reagent         Reagent
 	Storage         Storage
 	StorageCell     StorageCell
 }
@@ -191,8 +192,8 @@ func (r *ReagentInstanceExtended) Create() (BatchOperation, BatchRead) {
 func (r *ReagentInstanceRange) getQueue(
 	batch *pgx.Batch,
 ) {
-	cols := "reagent_instance.id, reagent_instance.created_at, reagent_instance.updated_at, reagent_instance.reagent, reagent_instance.used, reagent_instance.used_at, reagent_instance.expires_at, reagent_instance.storage_cell, storage_cell.id, storage_cell.created_at, storage_cell.updated_at, storage_cell.storage, storage_cell.number, storage.id, storage.created_at, storage.updated_at, storage.name, storage.cells"
-	join := "LEFT JOIN storage_cell ON reagent_instance.storage_cell = storage_cell.id LEFT JOIN storage ON storage_cell.storage = storage.id "
+	cols := "reagent_instance.id, reagent_instance.created_at, reagent_instance.updated_at, reagent_instance.reagent, reagent_instance.used_at, reagent_instance.expires_at, reagent_instance.storage_cell, reagent_instance.deleted_at, storage_cell.id, storage_cell.created_at, storage_cell.updated_at, storage_cell.storage, storage_cell.number, storage.id, storage.created_at, storage.updated_at, storage.name, storage.cells"
+	join := "LEFT JOIN storage_cell ON reagent_instance.storage_cell = storage_cell.id LEFT JOIN storage ON storage_cell.storage = storage.id"
 	filter := "reagent_instance.reagent=$1"
 	order := "reagent_instance.created_at"
 	query := fmt.Sprintf(
@@ -216,16 +217,17 @@ func (r *ReagentInstanceRange) getResult(results pgx.BatchResults) error {
 	}
 	for next {
 		var i ReagentInstanceExtended
-		var usedAtVal pgtype.TimestamptzValuer
+		var usedAt pgtype.Timestamptz
+		var deletedAt pgtype.Timestamptz
 		err = rows.Scan(
 			&i.ReagentInstance.ID,
 			&i.ReagentInstance.CreatedAt,
 			&i.ReagentInstance.UpdatedAt,
 			&i.ReagentInstance.Reagent,
-			&i.ReagentInstance.Used,
-			usedAtVal,
+			&usedAt,
 			&i.ReagentInstance.ExpiresAt,
 			&i.ReagentInstance.StorageCell,
+			&deletedAt,
 			&i.StorageCell.ID,
 			&i.StorageCell.CreatedAt,
 			&i.StorageCell.UpdatedAt,
@@ -240,12 +242,8 @@ func (r *ReagentInstanceRange) getResult(results pgx.BatchResults) error {
 		if err != nil {
 			return err
 		}
-		if usedAtVal != nil {
-			usedAtPgxTz, err := usedAtVal.TimestamptzValue()
-			if err == nil {
-				i.ReagentInstance.UsedAt = usedAtPgxTz.Time
-			}
-		}
+		i.ReagentInstance.UsedAt = pgTypeToTime(usedAt)
+		i.ReagentInstance.DeletedAt = pgTypeToTime(deletedAt)
 		r.ReagentInstancesExtended = append(r.ReagentInstancesExtended, i)
 		next = rows.Next()
 	}
@@ -254,4 +252,105 @@ func (r *ReagentInstanceRange) getResult(results pgx.BatchResults) error {
 
 func (r *ReagentInstanceRange) Get() (BatchOperation, BatchRead) {
 	return r.getQueue, r.getResult
+}
+
+func (r ReagentInstance) getQueue(
+	batch *pgx.Batch,
+) {
+	cols := "reagent_instance.created_at, reagent_instance.updated_at, reagent_instance.used_at, reagent_instance.expires_at, reagent_instance.storage_cell, reagent_instance.deleted_at, reagent.id, reagent.created_at, reagent.updated_at, reagent.name, reagent.formula, storage_cell.id, storage_cell.created_at, storage_cell.updated_at, storage_cell.storage, storage_cell.number, storage.id, storage.created_at, storage.updated_at, storage.name, storage.cells"
+	join := "LEFT JOIN storage_cell ON reagent_instance.storage_cell = storage_cell.id LEFT JOIN storage ON storage_cell.storage = storage.id LEFT JOIN reagent ON reagent_instance.reagent = reagent.id"
+	filter := "reagent_instance.id=$1 AND reagent_instance.reagent=$2"
+	query := fmt.Sprintf("SELECT %s FROM reagent_instance %s WHERE %s", cols, join, filter)
+	batch.Queue(query, r.ID, r.Reagent)
+}
+
+func (r *ReagentInstanceExtended) getResult(results pgx.BatchResults) error {
+	var usedAt pgtype.Timestamptz
+	var deletedAt pgtype.Timestamptz
+	err := results.QueryRow().Scan(
+		&r.ReagentInstance.CreatedAt,
+		&r.ReagentInstance.UpdatedAt,
+		&usedAt,
+		&r.ReagentInstance.ExpiresAt,
+		&r.ReagentInstance.StorageCell,
+		&deletedAt,
+		&r.Reagent.ID,
+		&r.Reagent.CreatedAt,
+		&r.Reagent.UpdatedAt,
+		&r.Reagent.Name,
+		&r.Reagent.Formula,
+		&r.StorageCell.ID,
+		&r.StorageCell.CreatedAt,
+		&r.StorageCell.UpdatedAt,
+		&r.StorageCell.Storage,
+		&r.StorageCell.Number,
+		&r.Storage.ID,
+		&r.Storage.CreatedAt,
+		&r.Storage.UpdatedAt,
+		&r.Storage.Name,
+		&r.Storage.Cells,
+	)
+	if err != nil {
+		return err
+	}
+	r.ReagentInstance.UsedAt = pgTypeToTime(usedAt)
+	r.ReagentInstance.DeletedAt = pgTypeToTime(deletedAt)
+	return nil
+}
+
+func (r *ReagentInstanceExtended) Get() (BatchOperation, BatchRead) {
+	return r.ReagentInstance.getQueue, r.getResult
+}
+
+func (r ReagentInstanceExtended) updateQueue(
+	batch *pgx.Batch,
+) {
+	colsToUpdate := ""
+	args := []any{r.ReagentInstance.ID, r.ReagentInstance.Reagent}
+	argNum := 3
+	if !r.ReagentInstance.UsedAt.IsZero() {
+		colsToUpdate = fmt.Sprintf("used_at=$%d", argNum)
+		args = append(args, r.ReagentInstance.UsedAt)
+		argNum++
+	}
+	if r.StorageCell.Number != 0 {
+		arg := fmt.Sprintf(
+			"storage_cell=(SELECT id FROM storage_cell WHERE storage=$%d AND number=$%d)",
+			argNum,
+			argNum+1,
+		)
+		if colsToUpdate != "" {
+			arg = ", " + arg
+		}
+		colsToUpdate = colsToUpdate + arg
+		args = append(args, r.Storage.ID, r.StorageCell.Number)
+		argNum = argNum + 2
+	}
+	if !r.ReagentInstance.DeletedAt.IsZero() {
+		arg := fmt.Sprintf("deleted_at=$%d", argNum)
+		if colsToUpdate != "" {
+			arg = ", " + arg
+		}
+		colsToUpdate = colsToUpdate + arg
+		args = append(args, r.ReagentInstance.DeletedAt)
+	}
+	query := fmt.Sprintf("UPDATE reagent_instance SET %s WHERE id=$1 AND reagent=$2", colsToUpdate)
+	batch.Queue(query, args...)
+}
+
+func (r *ReagentInstanceExtended) updateResult(results pgx.BatchResults) error {
+	result, err := results.Exec()
+	affectedRows := result.RowsAffected()
+	if err != nil {
+		return err
+	} else if affectedRows != 1 {
+		if affectedRows == 0 {
+			return pgx.ErrNoRows
+		}
+	}
+	return nil
+}
+
+func (r *ReagentInstanceExtended) Update() (BatchOperation, BatchRead) {
+	return r.updateQueue, r.updateResult
 }

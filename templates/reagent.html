@@ -6,7 +6,7 @@
   <div class="flex justify-center">
   <div x-data="{name: '{{.Name}}', formula: '{{.Formula}}'}" class="w-3/5 bg-blue mt-8 rounded-md">
       <div class="grid grid-cols-1">
-        <div class='bg-{{if $isAssitstant}}gray-light{{else}}yellow{{end}} p-8 rounded-md'>
+        <div class="bg-{{if $isAssitstant}}gray-light{{else}}yellow{{end}} p-8 rounded-md">
           {{template "reagent" .}}
         </div>
         {{if or $isAssitstant $isLecturer}}
@@ -15,6 +15,12 @@
               <legend class="text-white text-xl">В наявності</legend>
               <div class="grid grid-cols-2 gap-4">
                 {{template "instances-search" .}}
+              </div>
+            </fieldset>
+            <fieldset class="px-2 pb-2 pt-4 border-2 border-white rounded-md">
+              <legend class="text-white text-xl">Викоритсані</legend>
+              <div class="grid grid-cols-2 gap-4">
+                {{template "used-instances-search" .}}
               </div>
             </fieldset>
           </div>

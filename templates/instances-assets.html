@@ -1,19 +1,42 @@
 {{block "instances-search" .}}
+  <script src="/static/localize-datetime.js"></script>
   {{range .InstancesSlice}}
     <button onClick="window.location.href='/reagents/{{.ReagentInstance.Reagent}}/instances/{{.ReagentInstance.ID}}';" class="flex bg-yellow rounded-md w-full px-8 py-3">
-      <ul class="list-none">
+      <ul x-data="{expiresAt: localizeDate('{{.ReagentInstance.ExpiresAt.UTC.Format "Mon Jan _2 15:04:05 MST 2006"}}')}" class="list-none">
         <div class="text-left">Склад: {{.Storage.Name}}</div>
         <div class="text-left">Відділ: {{.StorageCell.Number}}</div>
-        <div class="text-left">Термін придатності: {{.ReagentInstance.ExpiresAt.Format "2-1-2006"}}</div>
+        <div class="flex"><div class="text-left mr-2">Термін придатності:</div><div x-text="expiresAt"></div></div>
       </ul>
     </button>
   {{end}}
   {{if .NextOffset}}
     <button onClick="window.location.href='/reagents/{{.LastInstance.ReagentInstance.Reagent}}/instances/{{.LastInstance.ReagentInstance.ID}}';" hx-get="/api/v1/reagents/{{.LastInstance.ReagentInstance.Reagent}}/instances/?offset={{.NextOffset}}" hx-trigger="revealed" hx-swap="afterend" class="flex bg-yellow rounded-md w-full px-8 py-3">
-      <ul class="list-none">
+      <ul x-data="{expiresAt: localizeDate('{{.LastInstance.ReagentInstance.ExpiresAt.UTC.Format "Mon Jan _2 15:04:05 MST 2006"}}')}" class="list-none">
         <div class="text-left">Склад: {{.LastInstance.Storage.Name}}</div>
         <div class="text-left">Відділ: {{.LastInstance.StorageCell.Number}}</div>
-        <div class="text-left">Термін придатності: {{.LastInstance.ReagentInstance.ExpiresAt.Format "2-1-2006"}}</div>
+        <div class="flex"><div class="text-left mr-2">Термін придатності:</div><div x-text="expiresAt"></div></div>
+      </ul>
+    </button>
+  {{end}}
+{{end}}
+
+{{block "used-instances-search" .}}
+  <script src="/static/localize-datetime.js"></script>
+  {{range .UsedInstancesSlice}}
+    <button onClick="window.location.href='/reagents/{{.ReagentInstance.Reagent}}/instances/{{.ReagentInstance.ID}}';" class="flex bg-yellow rounded-md w-full px-8 py-3">
+      <ul x-data="{usedAt: localizeDatetime('{{.ReagentInstance.UsedAt.UTC.Format "Mon Jan _2 15:04:05 MST 2006"}}')}" class="list-none">
+        <div class="text-left">Склад: {{.Storage.Name}}</div>
+        <div class="text-left">Відділ: {{.StorageCell.Number}}</div>
+        <div class="flex"><div class="text-left mr-2">Використано:</div><div x-text="usedAt"></div></div>
+      </ul>
+    </button>
+  {{end}}
+  {{if .NextOffsetUsed}}
+    <button onClick="window.location.href='/reagents/{{.LastUsedInstance.ReagentInstance.Reagent}}/instances/{{.LastUsedInstance.ReagentInstance.ID}}';" hx-get="/api/v1/reagents/{{.LastUsedInstance.ReagentInstance.Reagent}}/instances/?offset={{.NextOffset}}" hx-trigger="revealed" hx-swap="afterend" class="flex bg-yellow rounded-md w-full px-8 py-3">
+      <ul x-data="{usedAt: localizeDatetime('{{.LastUsedInstance.ReagentInstance.UsedAt.UTC.Format "Mon Jan _2 15:04:05 MST 2006"}}')}" class="list-none">
+        <div class="text-left">Склад: {{.LastUsedInstance.Storage.Name}}</div>
+        <div class="text-left">Відділ: {{.LastUsedInstance.StorageCell.Number}}</div>
+        <div class="flex"><div class="text-left">Використано:</div><div x-text="usedAt"></div></div>
       </ul>
     </button>
   {{end}}
@@ -27,12 +50,8 @@
     <div class="h-9 min-h-full col-span-5"></div>
     <div class="col-span-5 py-1 text-red">{{.ExpiresAtErr}}</div>
     <div class="text-xl py-1 mb-4 font-serif flex justify-left items-center col-span-3">Склад</div>
-    <div class="col-span-6" x-init="{{if .LoadStorages}}document.getElementById('storages-select').innerHTML = storages{{else}}storages = document.getElementById('storages-select').innerHTML{{end}}">
-      <select id="storages-select" x-init="$el.selectedIndex = selectedStorage" @change="cellTip = JSON.parse($el.value)['cells']; selectedStorage = $el.selectedIndex" class="mb-4 bg-gray-light rounded-lg w-full" name="storage">
-        {{range .StoragesSlice}}
-          <option value='{"id":"{{.ID}}", "cells":"{{.Cells}}"}'>{{.Name}}</option>
-        {{end}}
-      </select>
+    <div class="col-span-6" x-init="{{if .ReloadData}}document.getElementById('storages-select').innerHTML = storages{{else}}storages = document.getElementById('storages-select').innerHTML{{end}}">
+      {{template "storages-select" .}}
     </div>
     <div></div>
     <div class="text-xl font-serif flex justify-left items-center col-span-2">Відділ</div>
@@ -47,3 +66,22 @@
   </div>
 {{end}}
 
+{{block "instance" .}}
+<div x-init="editState = {{.EditState}};{{if .UsedAt}}isUsed = {{not .UsedAt.IsZero}};{{end}}{{if .ReloadUsedAt}}usedAt = localizeDatetime('{{.UsedAt.UTC.Format "Mon Jan _2 15:04:05 MST 2006"}}'){{end}}" id="instance" class="grid grid-cols-2">
+    <div x-text="reagentName" class="text-center mb-4 col-span-2"></div>
+    <div class="text-left">Склад:</div><div x-show="!editState" x-text="storageName"></div>
+    <div x-show="editState" x-init="{{if .ReloadStorages}}document.getElementById('storages-select').innerHTML = storages{{else}}storages = document.getElementById('storages-select').innerHTML{{end}}">
+      {{template "storages-select" .}}
+    </div>
+    <div class="text-left">Відділ:</div><div x-show="!editState" x-text="storageCellNumber"></div><input type="number" onkeypress="return (event.charCode !=8 && event.charCode ==0 || (event.charCode >= 48 && event.charCode <= 57))" :value="storageCellNumber" x-show="editState" name="cell" class="rounded-md border-2 border-{{if .CellErr}}red{{else}}gray{{end}}"/>
+    <div x-show="editState" class="flex col-span-2 justify-end">
+      <div class="mr-2">Кількість відділів на складі:</div>
+      <div class="mr-4" x-text="cellTip"></div>
+    </div>
+    <div x-show="editState" class="h-9 min-h-full col-span-2 text-red">{{.CellErr}}</div>
+    {{if not .UsedAt.IsZero}}
+      <div class="text-left mr-2">Використано:</div><div x-text="usedAt"></div>
+    {{end}}
+    <div class="text-left mr-2">Термін придатності:</div><div x-text="expiresAt"></div>
+  </div>
+{{end}}

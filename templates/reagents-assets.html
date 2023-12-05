@@ -11,11 +11,11 @@
   {{range .ReagentsSlice}}
       {{$NoInStorage := eq .Instances 0}}
       <button onClick="window.location.href='/reagents/{{.ID}}';" class="{{if and $AllowedRole $NoInStorage}}bg-yellow-light{{else}}bg-yellow{{end}} rounded-md shadow-lg shadow-gray">
-      <ul class="list-none">
-        <div class="pl-8 pr-8 py-3 text-left">{{.Name}}</div>
-        <div class="pl-8 pr-8 text-left">Формула: {{.Formula}}</div>
+      <ul class="px-8 py-3 list-none">
+        <div class="text-left">{{.Name}}</div>
+        <div class="text-left">Формула: {{.Formula}}</div>
         {{if $AllowedRole }}
-          <div class="pl-8 pr-8 pb-3 text-left">{{if $NoInStorage}}Немає в наявності{{else}}Кількість на складі: {{.Instances}}{{end}}</div>
+          <div class="text-left">{{if $NoInStorage}}Немає в наявності{{else}}Кількість на складі: {{.Instances}}{{end}}</div>
         {{end}}
       </ul>
     </button>

@@ -4,8 +4,10 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Kelvedler/ChemicalStorage/pkg/env"
@@ -43,4 +45,12 @@ func PerformBatch(ctx context.Context, dbpool *pgxpool.Pool, batchSets []BatchSe
 	}
 	results.Close()
 	return errs
+}
+
+func pgTypeToTime(pgTs pgtype.Timestamptz) (t time.Time) {
+	pgxTsVal, err := pgTs.TimestamptzValue()
+	if err == nil {
+		t = pgxTsVal.Time
+	}
+	return t
 }

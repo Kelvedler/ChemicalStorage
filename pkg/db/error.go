@@ -17,6 +17,7 @@ const (
 	uniqueViolation           = "23505"
 	invalidTextRepresentation = "22P02"
 	outOfLimits               = "A0001"
+	alreadySet                = "A0003"
 )
 
 type DBError struct {
@@ -46,10 +47,15 @@ type OutOfLimits struct {
 	column string
 }
 
+type AlreadySet struct {
+	table  string
+	column string
+}
+
 type ContextCanceled struct{}
 
 func getColumn(pgErr *pgconn.PgError) string {
-	columnRe := regexp.MustCompile(fmt.Sprintf("%s_([a-z]+).+", pgErr.TableName))
+	columnRe := regexp.MustCompile(fmt.Sprintf("%s_([a-z_]+)_(?:[a-z]+)", pgErr.TableName))
 	column := columnRe.FindStringSubmatch(pgErr.ConstraintName)[1]
 	return cases.Title(language.English).String(column)
 }
@@ -67,6 +73,11 @@ func ErrorAsStruct(err error) interface{} {
 			return InvalidUUID{}
 		case outOfLimits:
 			return OutOfLimits{
+				table:  pgErr.TableName,
+				column: getColumn(pgErr),
+			}
+		case alreadySet:
+			return AlreadySet{
 				table:  pgErr.TableName,
 				column: getColumn(pgErr),
 			}
