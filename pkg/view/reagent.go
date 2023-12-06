@@ -25,8 +25,8 @@ type reagentsData struct {
 	Caller        db.StorageUser
 }
 
-func (data *reagentsData) set(reagentsSlice []db.Reagent, src string, offset int) {
-	if len(reagentsSlice) > 1 {
+func (data *reagentsData) set(reagentsSlice []db.Reagent, src string, limit, offset int) {
+	if len(reagentsSlice) >= limit {
 		data.ReagentsSlice = reagentsSlice[:len(reagentsSlice)-1]
 		data.LastReagent = reagentsSlice[len(reagentsSlice)-1]
 		data.NextOffset = offset + len(reagentsSlice)
@@ -46,39 +46,16 @@ type reagentData struct {
 	PostXsrf           string
 	PutXsrf            string
 	InstancesSlice     []db.ReagentInstanceExtended
-	LastInstance       db.ReagentInstanceExtended
 	UsedInstancesSlice []db.ReagentInstanceExtended
-	LastUsedInstance   db.ReagentInstanceExtended
-	NextOffset         int
-	NextOffsetUsed     int
 }
 
-func (data *reagentData) addInstances(
-	instancesSlice []db.ReagentInstanceExtended,
-	offset, usedOffset int,
-) {
-	var unusedInstances []db.ReagentInstanceExtended
-	var usedInstances []db.ReagentInstanceExtended
+func (data *reagentData) addInstances(instancesSlice []db.ReagentInstanceExtended) {
 	for _, inst := range instancesSlice {
 		if inst.ReagentInstance.UsedAt.IsZero() {
-			unusedInstances = append(unusedInstances, inst)
+			data.InstancesSlice = append(data.InstancesSlice, inst)
 		} else {
-			usedInstances = append(usedInstances, inst)
+			data.UsedInstancesSlice = append(data.UsedInstancesSlice, inst)
 		}
-	}
-	if len(unusedInstances) > 1 {
-		data.InstancesSlice = unusedInstances[:len(unusedInstances)-1]
-		data.LastInstance = unusedInstances[len(unusedInstances)-1]
-		data.NextOffset = offset + len(unusedInstances)
-	} else {
-		data.InstancesSlice = unusedInstances
-	}
-	if len(usedInstances) > 1 {
-		data.UsedInstancesSlice = usedInstances[:len(usedInstances)-1]
-		data.LastUsedInstance = usedInstances[len(usedInstances)-1]
-		data.NextOffsetUsed = usedOffset + len(usedInstances)
-	} else {
-		data.UsedInstancesSlice = usedInstances
 	}
 }
 
@@ -105,9 +82,10 @@ func Reagents(
 	_ httprouter.Params,
 ) {
 	src := ""
+	limit := 24
 	offset := 0
 	reagentsRange := db.ReagentsRange{
-		Limit:  24,
+		Limit:  limit,
 		Offset: offset,
 		Src:    src,
 	}
@@ -124,7 +102,7 @@ func Reagents(
 		return
 	}
 	data := reagentsData{Caller: caller}
-	data.set(reagentsRange.Reagents, src, offset)
+	data.set(reagentsRange.Reagents, src, limit, offset)
 	tmpl := template.Must(
 		template.ParseFiles(
 			"templates/reagents.html",
@@ -141,7 +119,6 @@ func Reagent(
 	r *http.Request,
 	params httprouter.Params,
 ) {
-	offset := 0
 	reagentID, err := uuid.Parse(params.ByName("reagentID"))
 	if err != nil {
 		rc.Logger.Info("Invalid UUID")
@@ -152,8 +129,6 @@ func Reagent(
 	reagent := db.Reagent{ID: reagentID}
 	rir := db.ReagentInstanceRange{
 		ReagentID: reagentID,
-		Limit:     20,
-		Offset:    offset,
 	}
 	caller := db.StorageUser{ID: rc.UserID}
 	errs := db.PerformBatch(
@@ -188,7 +163,7 @@ func Reagent(
 		Formula: reagent.Formula,
 		PutXsrf: getReagentPutXsrf(rc.UserID, reagentID),
 	}
-	data.addInstances(rir.ReagentInstancesExtended, offset, 0)
+	data.addInstances(rir.ReagentInstancesExtended)
 	tmpl := template.Must(
 		template.ParseFiles(
 			"templates/reagent.html",
@@ -249,8 +224,9 @@ func ReagentsAPI(
 		w.WriteHeader(400)
 		return
 	}
+	limit := 24
 	reagentsRange := db.ReagentsRange{
-		Limit:  24,
+		Limit:  limit,
 		Offset: offset,
 		Src:    searchForm.Src,
 	}
@@ -262,7 +238,7 @@ func ReagentsAPI(
 		return
 	}
 	var data reagentsData
-	data.set(reagentsRange.Reagents, src, offset)
+	data.set(reagentsRange.Reagents, src, limit, offset)
 	data.Caller = db.StorageUser{ID: rc.UserID, Role: rc.UserRole}
 	tmpl := template.Must(
 		template.ParseFiles(

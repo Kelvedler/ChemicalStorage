@@ -159,8 +159,6 @@ type ReagentInstanceExtended struct {
 type ReagentInstanceRange struct {
 	ReagentInstancesExtended []ReagentInstanceExtended
 	ReagentID                uuid.UUID
-	Limit                    int
-	Offset                   int
 }
 
 func (r *ReagentInstanceExtended) createQueue(
@@ -197,13 +195,13 @@ func (r *ReagentInstanceRange) getQueue(
 	filter := "reagent_instance.reagent=$1"
 	order := "reagent_instance.created_at"
 	query := fmt.Sprintf(
-		"SELECT %s FROM reagent_instance %s WHERE %s ORDER BY %s DESC LIMIT $2 OFFSET $3",
+		"SELECT %s FROM reagent_instance %s WHERE %s ORDER BY %s DESC",
 		cols,
 		join,
 		filter,
 		order,
 	)
-	batch.Queue(query, r.ReagentID, r.Limit, r.Offset)
+	batch.Queue(query, r.ReagentID)
 }
 
 func (r *ReagentInstanceRange) getResult(results pgx.BatchResults) error {
