@@ -14,6 +14,7 @@ import (
 	"github.com/Kelvedler/ChemicalStorage/pkg/common"
 	"github.com/Kelvedler/ChemicalStorage/pkg/db"
 	"github.com/Kelvedler/ChemicalStorage/pkg/env"
+	"github.com/Kelvedler/ChemicalStorage/pkg/middleware"
 )
 
 type storageUsersData struct {
@@ -36,7 +37,7 @@ func (s *storageUsersData) set(storageUsersSlice []db.StorageUser, src string, o
 }
 
 func Users(
-	rc *RequestContext,
+	rc *middleware.RequestContext,
 	w http.ResponseWriter,
 	r *http.Request,
 	_ httprouter.Params,
@@ -47,17 +48,17 @@ func Users(
 		Limit:     20,
 		Offset:    offset,
 		Src:       src,
-		ExcludeID: rc.userID,
+		ExcludeID: rc.UserID,
 	}
-	caller := db.StorageUser{ID: rc.userID}
+	caller := db.StorageUser{ID: rc.UserID}
 	errs := db.PerformBatch(
 		r.Context(),
-		rc.dbpool,
+		rc.DBpool,
 		[]db.BatchSet{storageUsersRange.Get, caller.GetByID},
 	)
 	storageUsersErr := errs[0]
 	if storageUsersErr != nil {
-		rc.logger.Error(storageUsersErr.Error())
+		rc.Logger.Error(storageUsersErr.Error())
 		common.ErrorResp(w, common.Internal)
 		return
 	}
@@ -80,26 +81,26 @@ type userByIDData struct {
 }
 
 func User(
-	rc *RequestContext,
+	rc *middleware.RequestContext,
 	w http.ResponseWriter,
 	r *http.Request,
 	params httprouter.Params,
 ) {
 	userID, err := uuid.Parse(params.ByName("userID"))
 	if err != nil {
-		rc.logger.Info("Invalid UUID")
+		rc.Logger.Info("Invalid UUID")
 		common.ErrorResp(w, common.NotFound)
 	}
-	if userID == rc.userID {
-		rc.logger.Info("Cannot view self")
+	if userID == rc.UserID {
+		rc.Logger.Info("Cannot view self")
 		common.ErrorResp(w, common.Forbidden)
 		return
 	}
 	storageUser := db.StorageUser{ID: userID}
-	caller := db.StorageUser{ID: rc.userID}
+	caller := db.StorageUser{ID: rc.UserID}
 	errs := db.PerformBatch(
 		r.Context(),
-		rc.dbpool,
+		rc.DBpool,
 		[]db.BatchSet{storageUser.GetByID, caller.GetByID},
 	)
 	storageUserErr := errs[0]
@@ -107,11 +108,11 @@ func User(
 		errStruct := db.ErrorAsStruct(storageUserErr)
 		switch errStruct.(type) {
 		case db.InvalidUUID, db.DoesNotExist:
-			rc.logger.Info("Not found")
+			rc.Logger.Info("Not found")
 			common.ErrorResp(w, common.NotFound)
 			return
 		default:
-			rc.logger.Error(storageUserErr.Error())
+			rc.Logger.Error(storageUserErr.Error())
 			common.ErrorResp(w, common.Internal)
 			return
 		}
@@ -141,7 +142,7 @@ type UsersAPIForm struct {
 }
 
 func UsersAPI(
-	rc *RequestContext,
+	rc *middleware.RequestContext,
 	w http.ResponseWriter,
 	r *http.Request,
 	_ httprouter.Params,
@@ -153,30 +154,30 @@ func UsersAPI(
 	}
 	offset, err := strconv.Atoi(offsetStr)
 	if err != nil {
-		rc.logger.Info(err.Error())
+		rc.Logger.Info(err.Error())
 		return
 	}
 	srcForm := UsersAPIForm{Src: src, Offset: offset}
-	err = rc.validate.Struct(srcForm)
+	err = rc.Validate.Struct(srcForm)
 	if err != nil {
 		err = common.LocalizeValidationErrors(err.(validator.ValidationErrors), srcForm)
-		rc.logger.Info(err.Error())
+		rc.Logger.Info(err.Error())
 		return
 	}
 	storageUsersRange := db.StorageUsersRange{
 		Limit:     20,
 		Offset:    offset,
 		Src:       srcForm.Src,
-		ExcludeID: rc.userID,
+		ExcludeID: rc.UserID,
 	}
-	caller := db.StorageUser{ID: rc.userID}
+	caller := db.StorageUser{ID: rc.UserID}
 	errs := db.PerformBatch(
 		r.Context(),
-		rc.dbpool,
+		rc.DBpool,
 		[]db.BatchSet{storageUsersRange.Get, caller.GetByID},
 	)
 	if errs[0] != nil {
-		rc.logger.Error(errs[0].Error())
+		rc.Logger.Error(errs[0].Error())
 		return
 	}
 	data := storageUsersData{Caller: caller}
@@ -191,7 +192,7 @@ func UsersAPI(
 }
 
 func UserPutAPI(
-	rc *RequestContext,
+	rc *middleware.RequestContext,
 	w http.ResponseWriter,
 	r *http.Request,
 	params httprouter.Params,
@@ -199,44 +200,44 @@ func UserPutAPI(
 	var userInput db.StorageUserInput
 	err := common.BindJSON(r, &userInput)
 	if err != nil {
-		rc.logger.Error(err.Error())
+		rc.Logger.Error(err.Error())
 		common.ErrorResp(w, common.Internal)
 		return
 	}
 	userInput.ID = params.ByName("userID")
-	if userInput.ID == rc.userID.String() {
-		rc.logger.Info("Cannot update self")
+	if userInput.ID == rc.UserID.String() {
+		rc.Logger.Info("Cannot update self")
 		common.ErrorResp(w, common.Forbidden)
 		return
 	}
 	user, err := userInput.Bind()
 	if err != nil {
-		rc.logger.Error(err.Error())
+		rc.Logger.Error(err.Error())
 		common.ErrorResp(w, common.Internal)
 		return
 	}
 	if user.Role == db.Admin {
-		rc.logger.Info("Can't set admin role")
+		rc.Logger.Info("Can't set admin role")
 		w.WriteHeader(403)
 		return
 	}
-	err = rc.validate.StructPartial(user, "Active")
+	err = rc.Validate.StructPartial(user, "Active")
 	if err != nil {
 		err = common.LocalizeValidationErrors(err.(validator.ValidationErrors), user)
-		rc.logger.Info(err.Error())
+		rc.Logger.Info(err.Error())
 		return
 	}
-	errs := db.PerformBatch(r.Context(), rc.dbpool, []db.BatchSet{user.Update})
+	errs := db.PerformBatch(r.Context(), rc.DBpool, []db.BatchSet{user.Update})
 	userErr := errs[0]
 	if userErr != nil {
 		errStruct := db.ErrorAsStruct(userErr)
 		switch errStruct.(type) {
 		case db.InvalidUUID, db.DoesNotExist:
-			rc.logger.Info("Not found")
+			rc.Logger.Info("Not found")
 			common.ErrorResp(w, common.NotFound)
 			return
 		default:
-			rc.logger.Error(userErr.Error())
+			rc.Logger.Error(userErr.Error())
 			common.ErrorResp(w, common.Internal)
 			return
 		}

@@ -7,6 +7,7 @@ import (
 	"github.com/julienschmidt/httprouter"
 
 	"github.com/Kelvedler/ChemicalStorage/pkg/db"
+	"github.com/Kelvedler/ChemicalStorage/pkg/middleware"
 )
 
 type CallerData struct {
@@ -14,13 +15,13 @@ type CallerData struct {
 }
 
 func Index(
-	rc *RequestContext,
+	rc *middleware.RequestContext,
 	w http.ResponseWriter,
 	r *http.Request,
 	_ httprouter.Params,
 ) {
-	caller := db.StorageUser{ID: rc.userID}
-	_ = db.PerformBatch(r.Context(), rc.dbpool, []db.BatchSet{caller.GetByID})
+	caller := db.StorageUser{ID: rc.UserID}
+	_ = db.PerformBatch(r.Context(), rc.DBpool, []db.BatchSet{caller.GetByID})
 	data := CallerData{
 		Caller: caller,
 	}

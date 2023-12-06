@@ -6,10 +6,11 @@ import (
 	"github.com/julienschmidt/httprouter"
 
 	"github.com/Kelvedler/ChemicalStorage/pkg/auth"
+	"github.com/Kelvedler/ChemicalStorage/pkg/middleware"
 )
 
 func SignOutAPI(
-	_ *RequestContext,
+	_ *middleware.RequestContext,
 	w http.ResponseWriter,
 	_ *http.Request,
 	_ httprouter.Params,

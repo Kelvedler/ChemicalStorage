@@ -14,6 +14,7 @@ import (
 	"github.com/Kelvedler/ChemicalStorage/pkg/common"
 	"github.com/Kelvedler/ChemicalStorage/pkg/db"
 	"github.com/Kelvedler/ChemicalStorage/pkg/env"
+	"github.com/Kelvedler/ChemicalStorage/pkg/middleware"
 )
 
 type storagesData struct {
@@ -46,7 +47,7 @@ func (s *storagesData) set(storagesSlice []db.Storage, src string, offset int) {
 }
 
 func Storages(
-	rc *RequestContext,
+	rc *middleware.RequestContext,
 	w http.ResponseWriter,
 	r *http.Request,
 	_ httprouter.Params,
@@ -58,15 +59,15 @@ func Storages(
 		Offset: offset,
 		Src:    src,
 	}
-	caller := db.StorageUser{ID: rc.userID}
+	caller := db.StorageUser{ID: rc.UserID}
 	errs := db.PerformBatch(
 		r.Context(),
-		rc.dbpool,
+		rc.DBpool,
 		[]db.BatchSet{storagesRange.Get, caller.GetByID},
 	)
 	storagesErr := errs[0]
 	if storagesErr != nil {
-		rc.logger.Error(storagesErr.Error())
+		rc.Logger.Error(storagesErr.Error())
 		common.ErrorResp(w, common.Internal)
 		return
 	}
@@ -83,7 +84,7 @@ func Storages(
 }
 
 func StoragesAPI(
-	rc *RequestContext,
+	rc *middleware.RequestContext,
 	w http.ResponseWriter,
 	r *http.Request,
 	_ httprouter.Params,
@@ -95,14 +96,14 @@ func StoragesAPI(
 	}
 	offset, err := strconv.Atoi(offsetStr)
 	if err != nil {
-		rc.logger.Info(err.Error())
+		rc.Logger.Info(err.Error())
 		return
 	}
 	searchForm := SearchAPIForm{Src: src, Offset: offset}
-	err = rc.validate.Struct(searchForm)
+	err = rc.Validate.Struct(searchForm)
 	if err != nil {
 		err = common.LocalizeValidationErrors(err.(validator.ValidationErrors), searchForm)
-		rc.logger.Info(err.Error())
+		rc.Logger.Info(err.Error())
 		w.WriteHeader(400)
 		return
 	}
@@ -111,10 +112,10 @@ func StoragesAPI(
 		Offset: offset,
 		Src:    src,
 	}
-	errs := db.PerformBatch(r.Context(), rc.dbpool, []db.BatchSet{storagesRange.Get})
+	errs := db.PerformBatch(r.Context(), rc.DBpool, []db.BatchSet{storagesRange.Get})
 	storagesErr := errs[0]
 	if storagesErr != nil {
-		rc.logger.Error(storagesErr.Error())
+		rc.Logger.Error(storagesErr.Error())
 		w.WriteHeader(400)
 		return
 	}
@@ -126,30 +127,30 @@ func StoragesAPI(
 }
 
 func Storage(
-	rc *RequestContext,
+	rc *middleware.RequestContext,
 	w http.ResponseWriter,
 	r *http.Request,
 	params httprouter.Params,
 ) {
 	storageID, err := uuid.Parse(params.ByName("storageID"))
 	if err != nil {
-		rc.logger.Info("Invalid UUID")
+		rc.Logger.Info("Invalid UUID")
 		common.ErrorResp(w, common.NotFound)
 		return
 	}
 	storage := db.Storage{ID: storageID}
-	caller := db.StorageUser{ID: rc.userID}
-	errs := db.PerformBatch(r.Context(), rc.dbpool, []db.BatchSet{storage.Get, caller.GetByID})
+	caller := db.StorageUser{ID: rc.UserID}
+	errs := db.PerformBatch(r.Context(), rc.DBpool, []db.BatchSet{storage.Get, caller.GetByID})
 	storageErr := errs[0]
 	if storageErr != nil {
 		errStruct := db.ErrorAsStruct(storageErr)
 		switch errStruct.(type) {
 		case db.DoesNotExist:
-			rc.logger.Info("Not found")
+			rc.Logger.Info("Not found")
 			common.ErrorResp(w, common.NotFound)
 			return
 		default:
-			rc.logger.Error(storageErr.Error())
+			rc.Logger.Error(storageErr.Error())
 			common.ErrorResp(w, common.Internal)
 			return
 		}
@@ -171,8 +172,8 @@ func getStoragePostXsrf(userID uuid.UUID) string {
 	)
 }
 
-func sanitizeStorage(rc *RequestContext, storage *db.Storage) {
-	sanitizer := rc.sanitize
+func sanitizeStorage(rc *middleware.RequestContext, storage *db.Storage) {
+	sanitizer := rc.Sanitize
 	storage.Name = sanitizer.Sanitize(storage.Name)
 }
 
@@ -191,7 +192,7 @@ func storagePostErrMapAddInput(
 }
 
 func StorageCreate(
-	rc *RequestContext,
+	rc *middleware.RequestContext,
 	w http.ResponseWriter,
 	r *http.Request,
 	_ httprouter.Params,
@@ -203,17 +204,17 @@ func StorageCreate(
 			"templates/storages-assets.html",
 		),
 	)
-	caller := db.StorageUser{ID: rc.userID}
-	_ = db.PerformBatch(r.Context(), rc.dbpool, []db.BatchSet{caller.GetByID})
+	caller := db.StorageUser{ID: rc.UserID}
+	_ = db.PerformBatch(r.Context(), rc.DBpool, []db.BatchSet{caller.GetByID})
 	data := storageData{
 		Caller:   caller,
-		PostXsrf: getStoragePostXsrf(rc.userID),
+		PostXsrf: getStoragePostXsrf(rc.UserID),
 	}
 	tmpl.Execute(w, data)
 }
 
 func StorageCreateAPI(
-	rc *RequestContext,
+	rc *middleware.RequestContext,
 	w http.ResponseWriter,
 	r *http.Request,
 	_ httprouter.Params,
@@ -221,32 +222,32 @@ func StorageCreateAPI(
 	var input db.StorageInput
 	err := common.BindJSON(r, &input)
 	if err != nil {
-		rc.logger.Error(err.Error())
+		rc.Logger.Error(err.Error())
 		common.ErrorResp(w, common.Internal)
 		return
 	}
 	storage, err := input.Bind()
 	if err != nil {
-		rc.logger.Error(err.Error())
+		rc.Logger.Error(err.Error())
 		common.ErrorResp(w, common.Internal)
 		return
 	}
 	sanitizeStorage(rc, &storage)
 	tmpl := template.Must(template.ParseFiles("templates/storages-assets.html")).
 		Lookup("storage-form")
-	err = rc.validate.StructPartial(storage, "Name", "Cells")
+	err = rc.Validate.StructPartial(storage, "Name", "Cells")
 	if err != nil {
 		err = common.LocalizeValidationErrors(err.(validator.ValidationErrors), storage)
-		rc.logger.Info(err.Error())
+		rc.Logger.Info(err.Error())
 		errMap := err.(common.ValidationError).Map()
-		storagePostErrMapAddInput(errMap, storage, rc.userID)
+		storagePostErrMapAddInput(errMap, storage, rc.UserID)
 		tmpl.Execute(w, errMap)
 		return
 	}
-	errs := db.PerformBatch(r.Context(), rc.dbpool, []db.BatchSet{storage.Create})
+	errs := db.PerformBatch(r.Context(), rc.DBpool, []db.BatchSet{storage.Create})
 	storageErr := errs[0]
 	if storageErr != nil {
-		rc.logger.Error(storageErr.Error())
+		rc.Logger.Error(storageErr.Error())
 		common.ErrorResp(w, common.Internal)
 		return
 	}

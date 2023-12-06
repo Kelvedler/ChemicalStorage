@@ -10,10 +10,11 @@ import (
 	"github.com/Kelvedler/ChemicalStorage/pkg/auth"
 	"github.com/Kelvedler/ChemicalStorage/pkg/common"
 	"github.com/Kelvedler/ChemicalStorage/pkg/db"
+	"github.com/Kelvedler/ChemicalStorage/pkg/middleware"
 )
 
 func SignUp(
-	_ *RequestContext,
+	_ *middleware.RequestContext,
 	w http.ResponseWriter,
 	_ *http.Request,
 	_ httprouter.Params,
@@ -35,10 +36,10 @@ type signUpInput struct {
 }
 
 func sanitizeSignUpInput(
-	rc *RequestContext,
+	rc *middleware.RequestContext,
 	input *signUpInput,
 ) {
-	sanitizer := rc.sanitize
+	sanitizer := rc.Sanitize
 	input.Name = sanitizer.Sanitize(input.Name)
 	input.Password1 = sanitizer.Sanitize(input.Password1)
 	input.Password2 = sanitizer.Sanitize(input.Password2)
@@ -51,7 +52,7 @@ func signUpErrMapAddInput(errMap map[string]string, input signUpInput) {
 }
 
 func SignUpAPI(
-	rc *RequestContext,
+	rc *middleware.RequestContext,
 	w http.ResponseWriter,
 	r *http.Request,
 	_ httprouter.Params,
@@ -59,7 +60,7 @@ func SignUpAPI(
 	var input signUpInput
 	err := common.BindJSON(r, &input)
 	if err != nil {
-		rc.logger.Error(err.Error())
+		rc.Logger.Error(err.Error())
 		common.ErrorResp(w, common.Internal)
 		return
 	}
@@ -78,10 +79,10 @@ func SignUpAPI(
 		Password: input.Password1,
 		Role:     db.Unconfirmed,
 	}
-	err = rc.validate.StructPartial(newStorageUser, "Name", "Password")
+	err = rc.Validate.StructPartial(newStorageUser, "Name", "Password")
 	if err != nil {
 		err = common.LocalizeValidationErrors(err.(validator.ValidationErrors), newStorageUser)
-		rc.logger.Info(err.Error())
+		rc.Logger.Info(err.Error())
 		errMap := err.(common.ValidationError).Map()
 		signUpErrMapAddInput(errMap, input)
 		tmpl.Execute(w, errMap)
@@ -89,32 +90,32 @@ func SignUpAPI(
 	}
 	hashedPassword, err := common.HashPassword([]byte(newStorageUser.Password))
 	if err != nil {
-		rc.logger.Error(err.Error())
+		rc.Logger.Error(err.Error())
 		common.ErrorResp(w, common.Internal)
 		return
 	}
 	newStorageUser.Password = hashedPassword
-	errs := db.PerformBatch(r.Context(), rc.dbpool, []db.BatchSet{newStorageUser.Create})
+	errs := db.PerformBatch(r.Context(), rc.DBpool, []db.BatchSet{newStorageUser.Create})
 	userErr := errs[0]
 	if userErr != nil {
 		errStruct := db.ErrorAsStruct(userErr)
 		switch errStruct.(type) {
 		case db.UniqueViolation:
 			err = errStruct.(db.UniqueViolation).Localize(newStorageUser)
-			rc.logger.Info(err.Error())
+			rc.Logger.Info(err.Error())
 			errMap := err.(db.DBError).Map()
 			signUpErrMapAddInput(errMap, input)
 			tmpl.Execute(w, errMap)
 			return
 		default:
-			rc.logger.Error(userErr.Error())
+			rc.Logger.Error(userErr.Error())
 			common.ErrorResp(w, common.Internal)
 			return
 		}
 	}
 	err = auth.SetNewTokenCookie(w, newStorageUser)
 	if err != nil {
-		rc.logger.Error(err.Error())
+		rc.Logger.Error(err.Error())
 		common.ErrorResp(w, common.Internal)
 		return
 	}

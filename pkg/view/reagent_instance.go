@@ -15,6 +15,7 @@ import (
 	"github.com/Kelvedler/ChemicalStorage/pkg/common"
 	"github.com/Kelvedler/ChemicalStorage/pkg/db"
 	"github.com/Kelvedler/ChemicalStorage/pkg/env"
+	"github.com/Kelvedler/ChemicalStorage/pkg/middleware"
 )
 
 type instanceData struct {
@@ -64,14 +65,14 @@ func getInstanceTranserXsrf(userID, instanceID, reagentID uuid.UUID) string {
 }
 
 func ReagentInstanceCreate(
-	rc *RequestContext,
+	rc *middleware.RequestContext,
 	w http.ResponseWriter,
 	r *http.Request,
 	params httprouter.Params,
 ) {
 	reagentID, err := uuid.Parse(params.ByName("reagentID"))
 	if err != nil {
-		rc.logger.Info(err.Error())
+		rc.Logger.Info(err.Error())
 		common.ErrorResp(w, common.NotFound)
 		return
 	}
@@ -87,15 +88,15 @@ func ReagentInstanceCreate(
 		Limit:  40,
 		Offset: 0,
 	}
-	caller := db.StorageUser{ID: rc.userID}
+	caller := db.StorageUser{ID: rc.UserID}
 	errs := db.PerformBatch(
 		r.Context(),
-		rc.dbpool,
+		rc.DBpool,
 		[]db.BatchSet{storagesRange.Get, caller.GetByID},
 	)
 	storagesErr := errs[0]
 	if storagesErr != nil {
-		rc.logger.Error(storagesErr.Error())
+		rc.Logger.Error(storagesErr.Error())
 		common.ErrorResp(w, common.Internal)
 		return
 	}
@@ -108,8 +109,8 @@ func ReagentInstanceCreate(
 	tmpl.Execute(w, data)
 }
 
-func sanitizeReagentInstance(rc *RequestContext, input *reagentInstanceInput) {
-	sanitizer := rc.sanitize
+func sanitizeReagentInstance(rc *middleware.RequestContext, input *reagentInstanceInput) {
+	sanitizer := rc.Sanitize
 	input.ExpiresAt = sanitizer.Sanitize(input.ExpiresAt)
 	input.Storage = sanitizer.Sanitize(input.Storage)
 	input.Cell = sanitizer.Sanitize(input.Cell)
@@ -153,7 +154,7 @@ func (input reagentInstanceInput) Bind() (output reagentInstance, err error) {
 }
 
 func ReagentInstanceCreateAPI(
-	rc *RequestContext,
+	rc *middleware.RequestContext,
 	w http.ResponseWriter,
 	r *http.Request,
 	params httprouter.Params,
@@ -161,31 +162,31 @@ func ReagentInstanceCreateAPI(
 	var inputStr reagentInstanceInput
 	err := common.BindJSON(r, &inputStr)
 	if err != nil {
-		rc.logger.Error(err.Error())
+		rc.Logger.Error(err.Error())
 		common.ErrorResp(w, common.Internal)
 		return
 	}
 	sanitizeReagentInstance(rc, &inputStr)
 	input, err := inputStr.Bind()
 	if err != nil {
-		rc.logger.Error(err.Error())
+		rc.Logger.Error(err.Error())
 		common.ErrorResp(w, common.Internal)
 		return
 	}
 	tmpl := template.Must(template.ParseFiles("templates/instances-assets.html", "templates/storages-assets.html")).
 		Lookup("instance-form")
 	returnData := instanceData{ReloadData: true}
-	err = rc.validate.Struct(input)
+	err = rc.Validate.Struct(input)
 	if err != nil {
 		err = common.LocalizeValidationErrors(err.(validator.ValidationErrors), input)
-		rc.logger.Info(err.Error())
+		rc.Logger.Info(err.Error())
 		returnData.ExpiresAtErr = err.(common.ValidationError).Map()["ExpiresAtErr"]
 		tmpl.Execute(w, returnData)
 		return
 	}
 	reagentID, err := uuid.Parse(params.ByName("reagentID"))
 	if err != nil {
-		rc.logger.Info(err.Error())
+		rc.Logger.Info(err.Error())
 		common.ErrorResp(w, common.NotFound)
 		return
 	}
@@ -202,7 +203,7 @@ func ReagentInstanceCreateAPI(
 		Storage:         db.Storage{ID: input.Storage},
 		StorageCell:     storageCell,
 	}
-	errs := db.PerformBatch(r.Context(), rc.dbpool, []db.BatchSet{
+	errs := db.PerformBatch(r.Context(), rc.DBpool, []db.BatchSet{
 		storageCell.TryCreate,
 		reagentInstanceExtended.Create,
 	})
@@ -212,11 +213,11 @@ func ReagentInstanceCreateAPI(
 			switch errStruct.(type) {
 			case db.OutOfLimits:
 				err = errStruct.(db.OutOfLimits).Localize(storageCell)
-				rc.logger.Info(err.Error())
+				rc.Logger.Info(err.Error())
 				returnData.CellErr = err.(db.DBError).Map()["NumberErr"]
 				tmpl.Execute(w, returnData)
 			default:
-				rc.logger.Error(err.Error())
+				rc.Logger.Error(err.Error())
 				common.ErrorResp(w, common.Internal)
 			}
 			return
@@ -227,7 +228,7 @@ func ReagentInstanceCreateAPI(
 }
 
 func ReagentInstance(
-	rc *RequestContext,
+	rc *middleware.RequestContext,
 	w http.ResponseWriter,
 	r *http.Request,
 	params httprouter.Params,
@@ -236,12 +237,12 @@ func ReagentInstance(
 	instanceID, instanceErr := uuid.Parse(params.ByName("instanceID"))
 	for _, err := range []error{reagentErr, instanceErr} {
 		if err != nil {
-			rc.logger.Info(err.Error())
+			rc.Logger.Info(err.Error())
 			common.ErrorResp(w, common.NotFound)
 			return
 		}
 	}
-	caller := db.StorageUser{ID: rc.userID}
+	caller := db.StorageUser{ID: rc.UserID}
 	rie := db.ReagentInstanceExtended{
 		ReagentInstance: db.ReagentInstance{ID: instanceID, Reagent: reagentID},
 	}
@@ -251,7 +252,7 @@ func ReagentInstance(
 	}
 	errs := db.PerformBatch(
 		r.Context(),
-		rc.dbpool,
+		rc.DBpool,
 		[]db.BatchSet{rie.Get, storagesRange.Get, caller.GetByID},
 	)
 	for i, err := range errs {
@@ -260,14 +261,14 @@ func ReagentInstance(
 			switch errStruct.(type) {
 			case db.DoesNotExist:
 				if i == 2 {
-					rc.logger.Info("Unauthorized")
+					rc.Logger.Info("Unauthorized")
 					common.ErrorResp(w, common.Unauthorized)
 				} else {
-					rc.logger.Info("Not found")
+					rc.Logger.Info("Not found")
 					common.ErrorResp(w, common.NotFound)
 				}
 			default:
-				rc.logger.Error(instanceErr.Error())
+				rc.Logger.Error(instanceErr.Error())
 				common.ErrorResp(w, common.Internal)
 			}
 			return
@@ -283,8 +284,8 @@ func ReagentInstance(
 		Storage:       rie.Storage,
 		StorageCell:   rie.StorageCell,
 		StoragesSlice: storagesRange.Storages,
-		UseXsrf:       getInstanceUseXsrf(rc.userID, rie.ReagentInstance.ID, rie.Reagent.ID),
-		TransferXsrf:  getInstanceTranserXsrf(rc.userID, rie.ReagentInstance.ID, rie.Reagent.ID),
+		UseXsrf:       getInstanceUseXsrf(rc.UserID, rie.ReagentInstance.ID, rie.Reagent.ID),
+		TransferXsrf:  getInstanceTranserXsrf(rc.UserID, rie.ReagentInstance.ID, rie.Reagent.ID),
 	}
 	tmpl := template.Must(
 		template.ParseFiles(
@@ -298,7 +299,7 @@ func ReagentInstance(
 }
 
 func ReagentInstanceUseAPI(
-	rc *RequestContext,
+	rc *middleware.RequestContext,
 	w http.ResponseWriter,
 	r *http.Request,
 	params httprouter.Params,
@@ -307,7 +308,7 @@ func ReagentInstanceUseAPI(
 	instanceID, instanceErr := uuid.Parse(params.ByName("instanceID"))
 	for _, err := range []error{reagentErr, instanceErr} {
 		if err != nil {
-			rc.logger.Info(err.Error())
+			rc.Logger.Info(err.Error())
 			common.ErrorResp(w, common.NotFound)
 			return
 		}
@@ -318,25 +319,25 @@ func ReagentInstanceUseAPI(
 	rie := db.ReagentInstanceExtended{
 		ReagentInstance: db.ReagentInstance{ID: instanceID, Reagent: reagentID, UsedAt: time.Now()},
 	}
-	errs := db.PerformBatch(r.Context(), rc.dbpool, []db.BatchSet{rie.Update})
+	errs := db.PerformBatch(r.Context(), rc.DBpool, []db.BatchSet{rie.Update})
 	instanceErr = errs[0]
 	if instanceErr != nil {
 		errStruct := db.ErrorAsStruct(instanceErr)
 		switch errStruct.(type) {
 		case db.AlreadySet:
-			rc.logger.Info(instanceErr.Error())
+			rc.Logger.Info(instanceErr.Error())
 			common.ErrorResp(w, common.Internal)
 		case db.DoesNotExist:
-			rc.logger.Info(instanceErr.Error())
+			rc.Logger.Info(instanceErr.Error())
 			common.ErrorResp(w, common.NotFound)
 		default:
-			rc.logger.Error(instanceErr.Error())
+			rc.Logger.Error(instanceErr.Error())
 			common.ErrorResp(w, common.Internal)
 		}
 		return
 	}
 	data := instanceData{
-		Caller:       db.StorageUser{ID: rc.userID, Role: rc.userRole},
+		Caller:       db.StorageUser{ID: rc.UserID, Role: rc.UserRole},
 		UsedAt:       rie.ReagentInstance.UsedAt,
 		ReloadUsedAt: true,
 	}
@@ -344,7 +345,7 @@ func ReagentInstanceUseAPI(
 }
 
 func ReagentInstanceTransferAPI(
-	rc *RequestContext,
+	rc *middleware.RequestContext,
 	w http.ResponseWriter,
 	r *http.Request,
 	params httprouter.Params,
@@ -353,7 +354,7 @@ func ReagentInstanceTransferAPI(
 	instanceID, instanceErr := uuid.Parse(params.ByName("instanceID"))
 	for _, err := range []error{reagentErr, instanceErr} {
 		if err != nil {
-			rc.logger.Info(err.Error())
+			rc.Logger.Info(err.Error())
 			common.ErrorResp(w, common.NotFound)
 			return
 		}
@@ -361,14 +362,14 @@ func ReagentInstanceTransferAPI(
 	var inputStr reagentInstanceInput
 	err := common.BindJSON(r, &inputStr)
 	if err != nil {
-		rc.logger.Error(err.Error())
+		rc.Logger.Error(err.Error())
 		common.ErrorResp(w, common.Internal)
 		return
 	}
 	sanitizeReagentInstance(rc, &inputStr)
 	input, err := inputStr.Bind()
 	if err != nil {
-		rc.logger.Error(err.Error())
+		rc.Logger.Error(err.Error())
 		common.ErrorResp(w, common.Internal)
 		return
 	}
@@ -383,14 +384,14 @@ func ReagentInstanceTransferAPI(
 	}
 	errs := db.PerformBatch(
 		r.Context(),
-		rc.dbpool,
+		rc.DBpool,
 		[]db.BatchSet{storageCell.TryCreate, rie.Update},
 	)
 	tmpl := template.Must(
 		template.ParseFiles("templates/instances-assets.html", "templates/storages-assets.html"),
 	).Lookup("instance")
 	data := instanceData{
-		Caller:         db.StorageUser{ID: rc.userID, Role: rc.userRole},
+		Caller:         db.StorageUser{ID: rc.UserID, Role: rc.UserRole},
 		StorageCell:    rie.StorageCell,
 		ReloadStorages: true,
 	}
@@ -400,12 +401,12 @@ func ReagentInstanceTransferAPI(
 			switch errStruct.(type) {
 			case db.OutOfLimits:
 				err = errStruct.(db.OutOfLimits).Localize(storageCell)
-				rc.logger.Info(err.Error())
+				rc.Logger.Info(err.Error())
 				data.CellErr = err.(db.DBError).Map()["NumberErr"]
 				data.EditState = true
 				tmpl.Execute(w, data)
 			default:
-				rc.logger.Error(err.Error())
+				rc.Logger.Error(err.Error())
 				common.ErrorResp(w, common.Internal)
 			}
 			return
