@@ -4,6 +4,6 @@ import (
 	"github.com/microcosm-cc/bluemonday"
 )
 
-func GetSanitizer() *bluemonday.Policy {
+func NewSanitizer() *bluemonday.Policy {
 	return bluemonday.UGCPolicy()
 }

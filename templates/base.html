@@ -1,26 +1,26 @@
 {{block "navbar" .}}
   <div class="flex bg-gray-dark">
-    <button onClick="window.location.href='/';" class="bg-gray-dark hover:bg-gray w-1/12 rounded">
+    <button onClick="window.location.href='/';" class="bg-gray-dark hover:bg-gray w-1/12">
       <div class="flex justify-center"><img class="h-15" src="/static/homepage.png"></div>
     </button>
-    <button onClick="window.location.href='/reagents/';" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold w-1/6 py-4 rounded">
+    <button onClick="window.location.href='/reagents/';" class="btn-navbar w-1/6">
       Реагенти
     </button>
     {{if eq .Caller.Role.Name "assistant"}}
-      <button class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold w-1/6 py-4 rounded">
+      <button onclick="window.location.href='/storages/';" class="btn-navbar w-1/6">
         Склади
       </button>
     {{else if eq .Caller.Role.Name "admin"}}
-      <button onclick="window.location.href='/users';" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold w-1/6 py-4 rounded">
+      <button onclick="window.location.href='/users';" class="btn-navbar w-1/6">
         Користувачі
       </button>
     {{end}}
     <div class="grow"></div>
     {{if .Caller.Name}}
-      <button onClick="window.location.href='/me';" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold w-1/6 py-4 rounded">{{.Caller.Name}}</button>
-      <button hx-post="/api/v1/sign-out" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold w-1/12 py-4 rounded">Вийти</button>
+      <button onClick="window.location.href='/me';" class="btn-navbar w-1/6">{{.Caller.Name}}</button>
+      <button hx-post="/api/v1/sign-out" class="btn-navbar w-1/12">Вийти</button>
     {{else}}
-      <button onclick="window.location.href='/sign-in';" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold w-1/6 py-4 rounded">
+      <button onclick="window.location.href='/sign-in';" class="btn-navbar w-1/6">
         Увійти
       </button>
     {{end}}
@@ -36,9 +36,10 @@
       <meta name="viewport" content="width=device-width, initial-scale=1">
       <link href="/static/output.css" rel="stylesheet">
       <link href="/static/style.css" rel="stylesheet">
-      <script src="/static/htmx.min.js"></script>
-      <script src="/static/json-enc.js"></script>
-      <script src="/static/subscript-numbers.js"></script>
+      <script defer src="/static/alpine-morph.min.js"></script>
+      <script defer src="/static/alpine.min.js"></script>
+      <script defer src="/static/htmx.min.js"></script>
+      <script defer src="/static/json-enc.js"></script>
     </head>
     <body class="bg-blue-light relative">
       <div class="sticky top-0 left-0 right-0">

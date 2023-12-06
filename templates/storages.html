@@ -1,0 +1,12 @@
+{{template "base" .}}
+{{define "title"}}Склади{{end}}
+{{define "sticky-top"}}
+  {{template "storages-bar" .}}
+{{end}}
+{{define "content"}}
+  <div class="flex justify-center">
+    <div class="w-1/2">
+      {{template "storages-search" .}}
+    </div>
+  </div>
+{{end}}

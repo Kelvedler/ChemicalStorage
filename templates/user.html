@@ -2,8 +2,8 @@
 {{define "title"}}{{.User.Name}}{{end}}
 {{define "content"}}
   <div class="flex justify-center">
-    <div class="grid bg-yellow mt-2 rounded-md w-1/3 grid-cols-5">
-      <div class="px-8 pt-4 pb-2 border-b-2 col-span-5 border-gray-dark text-center">{{.User.Name}}</div>
+    <div class="grid bg-yellow mt-2 rounded-md w-1/3 grid-cols-5 py-4">
+      <div class="px-8 pb-2 border-b-2 col-span-5 border-gray-dark text-center">{{.User.Name}}</div>
       <div class="py-2 mt-4 mb-2 text-center">Роль</div>
       <div class="col-span-3">
         <select class="mt-4 mb-2 bg-gray-light rounded-lg" name="role">
@@ -22,7 +22,7 @@
       </div>
       <div class="col-span-3"></div>
       <div></div>
-    <button hx-put="/api/v1/users/{{.User.ID}}" hx-ext="json-enc" hx-target="#dump" hx-include="[name='role'], [name='active']" hx-headers='{"_xsrf": "{{ .UserPutXsrf }}"}' class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold col-span-3 justify-center py-4 my-4 rounded-md">
+      <button hx-put="/api/v1/users/{{.User.ID}}" hx-ext="json-enc" hx-target="#dump" hx-include="[name='role'], [name='active']" hx-headers='{"_xsrf": "{{ .UserPutXsrf }}"}' class="btn-dark col-span-3">
         Внести зміни
       </button>
       <div id="dump"></div>

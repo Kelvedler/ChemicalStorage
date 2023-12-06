@@ -7,9 +7,9 @@
     <div class="h-9 min-h-full col-span-2"></div>
     <div class="col-span-8 py-1">{{.InputErr}}</div>
     <div class="col-span-2"></div>
-    <button hx-post="/api/v1/sign-in" hx-ext="json-enc" hx-target="#sign-in-form" hx-include="[name='name'], [name='password']" hx-swap="outerHTML" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold col-span-6 justify-center py-4 rounded-md">Увійти</button>
+    <button hx-post="/api/v1/sign-in" hx-ext="json-enc" hx-target="#sign-in-form" hx-include="[name='name'], [name='password']" hx-swap="outerHTML" class="btn-dark col-span-6">Увійти</button>
     <div class="col-span-2"></div>
     <div class="text-xl font-serif flex justify-center items-center col-span-5 mt-8">Відсутній аккаунт?</div>
-    <button onclick="window.location.href='/sign-up';" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold col-span-5 mt-8 justify-center py-4 rounded-md">Зареєструватися</button>
+    <button onclick="window.location.href='/sign-up';" class="btn-dark col-span-5 mt-8">Зареєструватися</button>
   </div>
 {{end}}

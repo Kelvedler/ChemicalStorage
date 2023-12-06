@@ -10,10 +10,11 @@ import (
 	"github.com/Kelvedler/ChemicalStorage/pkg/auth"
 	"github.com/Kelvedler/ChemicalStorage/pkg/common"
 	"github.com/Kelvedler/ChemicalStorage/pkg/db"
+	"github.com/Kelvedler/ChemicalStorage/pkg/middleware"
 )
 
 func SignIn(
-	_ *RequestContext,
+	_ *middleware.RequestContext,
 	w http.ResponseWriter,
 	_ *http.Request,
 	_ httprouter.Params,
@@ -29,16 +30,16 @@ func SignIn(
 }
 
 func sanitizeStorageUser(
-	rc *RequestContext,
+	rc *middleware.RequestContext,
 	storageUser *db.StorageUser,
 ) {
-	sanitizer := rc.sanitize
+	sanitizer := rc.Sanitize
 	storageUser.Name = sanitizer.Sanitize(storageUser.Name)
 	storageUser.Password = sanitizer.Sanitize(storageUser.Password)
 }
 
 func SignInAPI(
-	rc *RequestContext,
+	rc *middleware.RequestContext,
 	w http.ResponseWriter,
 	r *http.Request,
 	_ httprouter.Params,
@@ -46,7 +47,7 @@ func SignInAPI(
 	var storageUserInput db.StorageUser
 	err := common.BindJSON(r, &storageUserInput)
 	if err != nil {
-		rc.logger.Error(err.Error())
+		rc.Logger.Error(err.Error())
 		common.ErrorResp(w, common.Internal)
 		return
 	}
@@ -58,26 +59,24 @@ func SignInAPI(
 	errMap["InputErr"] = "Невірний логін або пароль"
 	errMap["Name"] = storageUserInput.Name
 	errMap["Password"] = storageUserInput.Password
-	err = rc.validate.StructPartial(storageUserInput, "Name", "Password")
+	err = rc.Validate.StructPartial(storageUserInput, "Name", "Password")
 	if err != nil {
 		err = common.LocalizeValidationErrors(err.(validator.ValidationErrors), storageUserInput)
-		rc.logger.Info(err.Error())
+		rc.Logger.Info(err.Error())
 		tmpl.Execute(w, errMap)
 		return
 	}
-	storageUser, err := db.StorageUserGetByName(
-		r.Context(),
-		rc.dbpool,
-		storageUserInput.Name,
-	)
-	if err != nil {
-		errStruct := db.ErrorAsStruct(err)
+	storageUser := db.StorageUser{Name: storageUserInput.Name}
+	errs := db.PerformBatch(r.Context(), rc.DBpool, []db.BatchSet{storageUser.GetByName})
+	userErr := errs[0]
+	if userErr != nil {
+		errStruct := db.ErrorAsStruct(userErr)
 		switch errStruct.(type) {
 		case db.DoesNotExist:
-			rc.logger.Info("Not found")
+			rc.Logger.Info("Not found")
 			tmpl.Execute(w, errMap)
 		default:
-			rc.logger.Error(err.Error())
+			rc.Logger.Error(userErr.Error())
 			common.ErrorResp(w, common.Internal)
 		}
 		return
@@ -85,21 +84,21 @@ func SignInAPI(
 	passwordCorrect, err := common.ComparePasswords(storageUserInput.Password, storageUser.Password)
 	if !passwordCorrect {
 		if err == nil {
-			rc.logger.Info("Invalid password")
+			rc.Logger.Info("Invalid password")
 		} else {
-			rc.logger.Error(err.Error())
+			rc.Logger.Error(err.Error())
 		}
 		tmpl.Execute(w, errMap)
 	}
 	if !storageUser.Active {
-		rc.logger.Info("Deactivated user")
+		rc.Logger.Info("Deactivated user")
 		errMap["InputErr"] = "Акаунт декативовано"
 		tmpl.Execute(w, errMap)
 		return
 	}
 	err = auth.SetNewTokenCookie(w, storageUser)
 	if err != nil {
-		rc.logger.Error(err.Error())
+		rc.Logger.Error(err.Error())
 		common.ErrorResp(w, common.Internal)
 		return
 	}

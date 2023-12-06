@@ -1,0 +1,12 @@
+{{template "base" .}}
+{{define "title"}}Новий склад{{end}}
+{{define "content"}}
+  <div class="flex justify-center">
+    <div class="w-1/2 p-8 mt-8 rounded-lg bg-gray-light">
+      {{template "storage-form" .}}
+      <div class="flex w-full justify-center">
+        <button hx-post="/api/v1/storages" hx-ext="json-enc" hx-target="#storage-form" hx-include="[name='name'], [name='cells']" hx-headers='{"_xsrf": "{{ .PostXsrf }}"}' hx-swap="outerHTML" class="btn-dark w-1/3">Створити</button>
+      </div>
+    </div>
+  </div>
+{{end}}

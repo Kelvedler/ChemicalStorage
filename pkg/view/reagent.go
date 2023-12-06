@@ -7,12 +7,14 @@ import (
 	"text/template"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/google/uuid"
 	"github.com/julienschmidt/httprouter"
 	"golang.org/x/net/xsrftoken"
 
 	"github.com/Kelvedler/ChemicalStorage/pkg/common"
 	"github.com/Kelvedler/ChemicalStorage/pkg/db"
 	"github.com/Kelvedler/ChemicalStorage/pkg/env"
+	"github.com/Kelvedler/ChemicalStorage/pkg/middleware"
 )
 
 type reagentsData struct {
@@ -23,8 +25,8 @@ type reagentsData struct {
 	Caller        db.StorageUser
 }
 
-func newReagentsData(reagentsSlice []db.Reagent, src string, offset int) (data reagentsData) {
-	if len(reagentsSlice) > 1 {
+func (data *reagentsData) set(reagentsSlice []db.Reagent, src string, limit, offset int) {
+	if len(reagentsSlice) >= limit {
 		data.ReagentsSlice = reagentsSlice[:len(reagentsSlice)-1]
 		data.LastReagent = reagentsSlice[len(reagentsSlice)-1]
 		data.NextOffset = offset + len(reagentsSlice)
@@ -32,48 +34,75 @@ func newReagentsData(reagentsSlice []db.Reagent, src string, offset int) (data r
 	} else {
 		data.ReagentsSlice = reagentsSlice
 	}
-	return data
 }
 
 type reagentData struct {
-	Reagent db.Reagent
-	Caller  db.StorageUser
+	Caller             db.StorageUser
+	ID                 string
+	Name               string
+	Formula            string
+	NameErr            string
+	FormulaErr         string
+	PostXsrf           string
+	PutXsrf            string
+	InstancesSlice     []db.ReagentInstanceExtended
+	UsedInstancesSlice []db.ReagentInstanceExtended
 }
 
-type reagentNewData struct {
-	Caller          db.StorageUser
-	Name            string
-	Formula         string
-	NameErr         string
-	FormulaErr      string
-	ReagentPostXsrf string
+func (data *reagentData) addInstances(instancesSlice []db.ReagentInstanceExtended) {
+	for _, inst := range instancesSlice {
+		if inst.ReagentInstance.UsedAt.IsZero() {
+			data.InstancesSlice = append(data.InstancesSlice, inst)
+		} else {
+			data.UsedInstancesSlice = append(data.UsedInstancesSlice, inst)
+		}
+	}
 }
 
-func getReagentPostXsrf(userID string) string {
+func getReagentPostXsrf(userID uuid.UUID) string {
 	return xsrftoken.Generate(
 		env.Env.SecretKey,
-		userID,
+		userID.String(),
 		"/api/v1/reagents",
 	)
 }
 
+func getReagentPutXsrf(userID, reagentID uuid.UUID) string {
+	return xsrftoken.Generate(
+		env.Env.SecretKey,
+		userID.String(),
+		fmt.Sprintf("/api/v1/reagents/%s", reagentID),
+	)
+}
+
 func Reagents(
-	rc *RequestContext,
+	rc *middleware.RequestContext,
 	w http.ResponseWriter,
 	r *http.Request,
 	_ httprouter.Params,
 ) {
-	offset := 0
 	src := ""
-	reagentsSlice, err := db.ReagentGetRange(r.Context(), rc.dbpool, 20, offset, src)
-	if err != nil {
-		rc.logger.Error(err.Error())
+	limit := 24
+	offset := 0
+	reagentsRange := db.ReagentsRange{
+		Limit:  limit,
+		Offset: offset,
+		Src:    src,
+	}
+	caller := db.StorageUser{ID: rc.UserID}
+	errs := db.PerformBatch(
+		r.Context(),
+		rc.DBpool,
+		[]db.BatchSet{reagentsRange.Get, caller.GetByID},
+	)
+	reagentsErr := errs[0]
+	if reagentsErr != nil {
+		rc.Logger.Error(reagentsErr.Error())
 		common.ErrorResp(w, common.Internal)
 		return
 	}
-	data := newReagentsData(reagentsSlice, src, offset)
-	storageUser, _ := db.StorageUserGetByID(r.Context(), rc.dbpool, rc.userID)
-	data.Caller = storageUser
+	data := reagentsData{Caller: caller}
+	data.set(reagentsRange.Reagents, src, limit, offset)
 	tmpl := template.Must(
 		template.ParseFiles(
 			"templates/reagents.html",
@@ -85,37 +114,69 @@ func Reagents(
 }
 
 func Reagent(
-	rc *RequestContext,
+	rc *middleware.RequestContext,
 	w http.ResponseWriter,
 	r *http.Request,
 	params httprouter.Params,
 ) {
-	reagent_id := params.ByName("id")
-	reagent, err := db.ReagentGet(r.Context(), rc.dbpool, reagent_id)
+	reagentID, err := uuid.Parse(params.ByName("reagentID"))
 	if err != nil {
-		errStruct := db.ErrorAsStruct(err)
+		rc.Logger.Info("Invalid UUID")
+		common.ErrorResp(w, common.NotFound)
+		return
+	}
+
+	reagent := db.Reagent{ID: reagentID}
+	rir := db.ReagentInstanceRange{
+		ReagentID: reagentID,
+	}
+	caller := db.StorageUser{ID: rc.UserID}
+	errs := db.PerformBatch(
+		r.Context(),
+		rc.DBpool,
+		[]db.BatchSet{reagent.Get, rir.Get, caller.GetByID},
+	)
+	reagentErr := errs[0]
+	reagentInstanceErr := errs[1]
+	if reagentErr != nil {
+		errStruct := db.ErrorAsStruct(reagentErr)
 		switch errStruct.(type) {
-		case db.InvalidUUID, db.DoesNotExist:
-			rc.logger.Info("Not found")
+		case db.DoesNotExist:
+			rc.Logger.Info("Not found")
 			common.ErrorResp(w, common.NotFound)
 			return
 		default:
-			rc.logger.Error(err.Error())
+			rc.Logger.Error(reagentErr.Error())
 			common.ErrorResp(w, common.Internal)
 			return
 		}
 	}
-	storageUser, _ := db.StorageUserGetByID(r.Context(), rc.dbpool, rc.userID)
-	data := reagentData{
-		Reagent: reagent,
-		Caller:  storageUser,
+	if reagentInstanceErr != nil {
+		rc.Logger.Error(reagentInstanceErr.Error())
+		common.ErrorResp(w, common.Internal)
+		return
 	}
-	tmpl := template.Must(template.ParseFiles("templates/reagent.html", "templates/base.html"))
+	data := reagentData{
+		Caller:  caller,
+		ID:      reagent.ID.String(),
+		Name:    reagent.Name,
+		Formula: reagent.Formula,
+		PutXsrf: getReagentPutXsrf(rc.UserID, reagentID),
+	}
+	data.addInstances(rir.ReagentInstancesExtended)
+	tmpl := template.Must(
+		template.ParseFiles(
+			"templates/reagent.html",
+			"templates/reagents-assets.html",
+			"templates/instances-assets.html",
+			"templates/base.html",
+		),
+	)
 	tmpl.Execute(w, data)
 }
 
 func ReagentCreate(
-	rc *RequestContext,
+	rc *middleware.RequestContext,
 	w http.ResponseWriter,
 	r *http.Request,
 	_ httprouter.Params,
@@ -127,21 +188,17 @@ func ReagentCreate(
 			"templates/reagents-assets.html",
 		),
 	)
-	storageUser, _ := db.StorageUserGetByID(r.Context(), rc.dbpool, rc.userID)
-	data := reagentNewData{
-		Caller:          storageUser,
-		ReagentPostXsrf: getReagentPostXsrf(rc.userID),
+	caller := db.StorageUser{ID: rc.UserID}
+	_ = db.PerformBatch(r.Context(), rc.DBpool, []db.BatchSet{caller.GetByID})
+	data := reagentData{
+		Caller:   caller,
+		PostXsrf: getReagentPostXsrf(rc.UserID),
 	}
 	tmpl.Execute(w, data)
 }
 
-type ReagentsAPIForm struct {
-	Src    string `json:"src"    validate:"omitempty,lte=50"          uaLocal:"пошук"`
-	Offset int    `json:"offset" validate:"omitempty,min=0,max=10000" uaLocal:"зміщення"`
-}
-
 func ReagentsAPI(
-	rc *RequestContext,
+	rc *middleware.RequestContext,
 	w http.ResponseWriter,
 	r *http.Request,
 	_ httprouter.Params,
@@ -153,55 +210,57 @@ func ReagentsAPI(
 	}
 	offset, err := strconv.Atoi(offsetStr)
 	if err != nil {
-		rc.logger.Info(err.Error())
+		rc.Logger.Info(err.Error())
+		common.ErrorResp(w, common.Internal)
 		return
 	}
+	target := r.URL.Query().Get("target")
 
-	srcForm := ReagentsAPIForm{Src: src, Offset: offset}
-	err = rc.validate.Struct(srcForm)
+	searchForm := SearchAPIForm{Src: src, Offset: offset, Target: target}
+	err = rc.Validate.Struct(searchForm)
 	if err != nil {
-		err = common.LocalizeValidationErrors(err.(validator.ValidationErrors), srcForm)
-		rc.logger.Info(err.Error())
+		err = common.LocalizeValidationErrors(err.(validator.ValidationErrors), searchForm)
+		rc.Logger.Info(err.Error())
 		w.WriteHeader(400)
 		return
 	}
-	reagentsSlice, err := db.ReagentGetRange(
-		r.Context(),
-		rc.dbpool,
-		20,
-		offset,
-		srcForm.Src,
-	)
-	if err != nil {
-		rc.logger.Error(err.Error())
-		w.WriteHeader(400)
+	limit := 24
+	reagentsRange := db.ReagentsRange{
+		Limit:  limit,
+		Offset: offset,
+		Src:    searchForm.Src,
+	}
+	errs := db.PerformBatch(r.Context(), rc.DBpool, []db.BatchSet{reagentsRange.Get})
+	reagentsErr := errs[0]
+	if reagentsErr != nil {
+		rc.Logger.Error(reagentsErr.Error())
+		common.ErrorResp(w, common.Internal)
 		return
 	}
-	data := newReagentsData(reagentsSlice, src, offset)
+	var data reagentsData
+	data.set(reagentsRange.Reagents, src, limit, offset)
+	data.Caller = db.StorageUser{ID: rc.UserID, Role: rc.UserRole}
 	tmpl := template.Must(
 		template.ParseFiles(
-			"templates/reagents.html",
 			"templates/reagents-assets.html",
 		),
-	).Lookup("reagents-search")
+	)
+	if searchForm.Target == "grid" {
+		tmpl = tmpl.Lookup("reagents-grid")
+	} else {
+		tmpl = tmpl.Lookup("reagents-search")
+	}
 	tmpl.Execute(w, data)
 }
 
-func sanitizeReagent(rc *RequestContext, reagent *db.Reagent) {
-	sanitizer := rc.sanitize
+func sanitizeReagent(rc *middleware.RequestContext, reagent *db.Reagent) {
+	sanitizer := rc.Sanitize
 	reagent.Name = sanitizer.Sanitize(reagent.Name)
 	reagent.Formula = sanitizer.Sanitize(reagent.Formula)
 }
 
-func reagentErrMapAddInput(errMap map[string]string, reagent db.Reagent, userID string) {
-	reagentPostXsrf := getReagentPostXsrf(userID)
-	errMap["Formula"] = reagent.Formula
-	errMap["Name"] = reagent.Name
-	errMap["ReagentPostXsrf"] = reagentPostXsrf
-}
-
 func ReagentCreateAPI(
-	rc *RequestContext,
+	rc *middleware.RequestContext,
 	w http.ResponseWriter,
 	r *http.Request,
 	_ httprouter.Params,
@@ -209,41 +268,109 @@ func ReagentCreateAPI(
 	var reagent db.Reagent
 	err := common.BindJSON(r, &reagent)
 	if err != nil {
-		rc.logger.Error(err.Error())
+		rc.Logger.Error(err.Error())
 		common.ErrorResp(w, common.Internal)
 		return
 	}
 
 	sanitizeReagent(rc, &reagent)
 	tmpl := template.Must(template.ParseFiles("templates/reagents-assets.html")).
-		Lookup("create-form")
+		Lookup("reagent-form")
 
-	err = rc.validate.StructPartial(reagent, "Name", "Formula")
+	err = rc.Validate.StructPartial(reagent, "Name", "Formula")
+	var data reagentData
+	data.Caller.ID = rc.UserID
 	if err != nil {
 		err = common.LocalizeValidationErrors(err.(validator.ValidationErrors), reagent)
-		rc.logger.Info(err.Error())
+		rc.Logger.Info(err.Error())
 		errMap := err.(common.ValidationError).Map()
-		reagentErrMapAddInput(errMap, reagent, rc.userID)
-		tmpl.Execute(w, errMap)
+		data.NameErr = errMap["NameErr"]
+		data.FormulaErr = errMap["FormulaErr"]
+		tmpl.Execute(w, data)
 		return
 	}
-	reargentNew, err := db.ReagentCreate(r.Context(), rc.dbpool, reagent)
-	if err != nil {
-		errStruct := db.ErrorAsStruct(err)
+	errs := db.PerformBatch(r.Context(), rc.DBpool, []db.BatchSet{reagent.Create})
+	reagentErr := errs[0]
+	if reagentErr != nil {
+		errStruct := db.ErrorAsStruct(reagentErr)
 		switch errStruct.(type) {
 		case db.UniqueViolation:
-			err = errStruct.(db.UniqueViolation).LocalizeUniqueViolation(db.Reagent{})
-			rc.logger.Info(err.Error())
-			errMap := err.(db.DBError).Map()
-			reagentErrMapAddInput(errMap, reagent, rc.userID)
-			tmpl.Execute(w, errMap)
+			err = errStruct.(db.UniqueViolation).Localize(db.Reagent{})
+			rc.Logger.Info(err.Error())
+			data.FormulaErr = err.(db.DBError).Map()["FormulaErr"]
+			tmpl.Execute(w, data)
 			return
 		default:
-			rc.logger.Error(err.Error())
+			rc.Logger.Error(reagentErr.Error())
 			common.ErrorResp(w, common.Internal)
 			return
 		}
 	}
 
-	w.Header().Set("HX-Redirect", fmt.Sprintf("/reagents/%s", reargentNew.ID))
+	w.Header().Set("HX-Redirect", fmt.Sprintf("/reagents/%s", reagent.ID))
+}
+
+func ReagentPutAPI(
+	rc *middleware.RequestContext,
+	w http.ResponseWriter,
+	r *http.Request,
+	params httprouter.Params,
+) {
+	var reagent db.Reagent
+	err := common.BindJSON(r, &reagent)
+	if err != nil {
+		rc.Logger.Error(err.Error())
+		common.ErrorResp(w, common.Internal)
+		return
+	}
+	sanitizeReagent(rc, &reagent)
+	tmpl := template.Must(template.ParseFiles("templates/reagents-assets.html"))
+
+	errTmpl := tmpl.Lookup("reagent-form")
+
+	err = rc.Validate.StructPartial(reagent, "Name", "Formula")
+	if err != nil {
+		err = common.LocalizeValidationErrors(err.(validator.ValidationErrors), reagent)
+		rc.Logger.Info(err.Error())
+		errMap := err.(common.ValidationError).Map()
+		w.Header().Set("HX-Retarget", "#reagent-form")
+		errTmpl.Execute(w, errMap)
+		return
+	}
+	reagent.ID, err = uuid.Parse(params.ByName("reagentID"))
+	if err != nil {
+		rc.Logger.Info("Not found")
+		common.ErrorResp(w, common.NotFound)
+		return
+	}
+	errs := db.PerformBatch(r.Context(), rc.DBpool, []db.BatchSet{reagent.Update})
+	reagentErr := errs[0]
+	if reagentErr != nil {
+		errStruct := db.ErrorAsStruct(reagentErr)
+		switch errStruct.(type) {
+		case db.UniqueViolation:
+			err = errStruct.(db.UniqueViolation).Localize(db.Reagent{})
+			rc.Logger.Info(err.Error())
+			errMap := err.(db.DBError).Map()
+			w.Header().Set("HX-Retarget", "#reagent-form")
+			errTmpl.Execute(w, errMap)
+			return
+		default:
+			rc.Logger.Error(reagentErr.Error())
+			common.ErrorResp(w, common.Internal)
+			return
+		}
+	}
+	successTmpl := tmpl.Lookup("reagent")
+	caller := db.StorageUser{
+		Role: rc.UserRole,
+	}
+	data := reagentData{
+		Caller:  caller,
+		ID:      reagent.ID.String(),
+		Name:    reagent.Name,
+		Formula: reagent.Formula,
+		PutXsrf: getReagentPutXsrf(rc.UserID, reagent.ID),
+	}
+	successTmpl.Execute(w, data)
 }

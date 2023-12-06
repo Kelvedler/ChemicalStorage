@@ -10,6 +10,8 @@ services:
       - "5432:5432"
     volumes:
       - pg_data_local:/var/lib/postgresql/data/
+    command:
+      ["postgres", "-c", "log_statement=none"]
 volumes:
   pg_data_local:
 

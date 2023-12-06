@@ -1,3 +1,28 @@
 @tailwind base;
 @tailwind components;
+
+.btn-dark {
+  @apply bg-gray-dark text-white text-xl font-serif font-bold justify-center py-4 rounded-md;
+}
+
+.btn-dark:hover {
+  @apply bg-gray;
+}
+
+.btn-navbar {
+  @apply bg-gray-dark text-white text-xl font-serif font-bold py-4;
+}
+
+.btn-navbar:hover {
+  @apply bg-gray;
+}
+
+.btn-navbar-light {
+  @apply bg-gray-light text-xl font-serif font-bold py-4;
+}
+
+.btn-navbar-light:hover {
+  @apply bg-gray text-white;
+}
+
 @tailwind utilities;

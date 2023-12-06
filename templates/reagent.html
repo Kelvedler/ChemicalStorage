@@ -1,12 +1,48 @@
 {{template "base" .}}
-{{define "title"}}{{.Reagent.Name}}{{end}}
+{{define "title"}}{{.Name}}{{end}}
 {{define "content"}}
+  {{$isAssitstant := eq .Caller.Role.Name "assistant"}}
+  {{$isLecturer := eq .Caller.Role.Name "lecturer"}}
   <div class="flex justify-center">
-    <div class="flex bg-yellow mt-2 rounded-md w-1/2">
-      <ul class="list-none">
-        <div class="pl-8 pr-8 pt-3 text-left">{{.Reagent.Name}}</div>
-        <div class="pl-8 pr-8 pb-3 text-left">{{.Reagent.Formula}}</div>
-      </ul>
+  <div x-data="{name: '{{.Name}}', formula: '{{.Formula}}'}" class="w-3/5 bg-blue mt-8 rounded-md">
+      <div class="grid grid-cols-1">
+        <div class="bg-{{if $isAssitstant}}gray-light{{else}}yellow{{end}} p-8 rounded-md">
+          {{template "reagent" .}}
+        </div>
+        {{if or $isAssitstant $isLecturer}}
+          <script src="/static/localize-datetime.js"></script>
+          <div class="mx-2 mb-2 mt-4">
+            <fieldset class="px-2 pb-2 pt-4 border-2 border-white rounded-md">
+              <legend class="text-white text-xl">В наявності</legend>
+              <div class="grid grid-cols-2 gap-4">
+                {{range .InstancesSlice}}
+                  <button onClick="window.location.href='/reagents/{{.ReagentInstance.Reagent}}/instances/{{.ReagentInstance.ID}}';" class="flex bg-yellow rounded-md w-full px-8 py-3">
+                    <ul x-data="{expiresAt: localizeDate('{{.ReagentInstance.ExpiresAt.UTC.Format "Mon Jan _2 15:04:05 MST 2006"}}')}" class="list-none">
+                      <div class="text-left">Склад: {{.Storage.Name}}</div>
+                      <div class="text-left">Відділ: {{.StorageCell.Number}}</div>
+                      <div class="flex"><div class="text-left mr-2">Термін придатності:</div><div x-text="expiresAt"></div></div>
+                    </ul>
+                  </button>
+                {{end}}
+              </div>
+            </fieldset>
+            <fieldset class="px-2 pb-2 pt-4 border-2 border-white rounded-md">
+              <legend class="text-white text-xl">Викоритсані</legend>
+              <div class="grid grid-cols-2 gap-4">
+                {{range .UsedInstancesSlice}}
+                  <button onClick="window.location.href='/reagents/{{.ReagentInstance.Reagent}}/instances/{{.ReagentInstance.ID}}';" class="flex bg-yellow rounded-md w-full px-8 py-3">
+                    <ul x-data="{usedAt: localizeDatetime('{{.ReagentInstance.UsedAt.UTC.Format "Mon Jan _2 15:04:05 MST 2006"}}')}" class="list-none">
+                      <div class="text-left">Склад: {{.Storage.Name}}</div>
+                      <div class="text-left">Відділ: {{.StorageCell.Number}}</div>
+                      <div class="flex"><div class="text-left mr-2">Використано:</div><div x-text="usedAt"></div></div>
+                    </ul>
+                  </button>
+                {{end}}
+              </div>
+            </fieldset>
+          </div>
+        {{end}}
+      </div>
     </div>
   </div>
 {{end}}

@@ -1,5 +1,12 @@
 {{template "base" .}}
-{{define "title"}}Реагент{{end}}
+{{define "title"}}Новий реагент{{end}}
 {{define "content"}}
-  {{template "create-form" .}}
+  <div class="flex justify-center">
+    <div x-data="{name: '', formula: ''}" class="w-1/2 p-8 mt-8 rounded-lg bg-gray-light">
+      {{template "reagent-form" .}}
+      <div class="flex w-full justify-center">
+        <button hx-post="/api/v1/reagents" hx-ext="json-enc" hx-target="#reagent-form" hx-include="[name='name'], [name='formula']" hx-headers='{"_xsrf": "{{ .PostXsrf }}"}' hx-swap="outerHTML" class="btn-dark w-1/3">Створити</button>
+      </div>
+    </div>
+  </div>
 {{end}}

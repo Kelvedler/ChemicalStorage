@@ -16,6 +16,8 @@ import (
 const (
 	uniqueViolation           = "23505"
 	invalidTextRepresentation = "22P02"
+	outOfLimits               = "A0001"
+	alreadySet                = "A0003"
 )
 
 type DBError struct {
@@ -40,22 +42,45 @@ type InvalidUUID struct{}
 
 type DoesNotExist struct{}
 
+type OutOfLimits struct {
+	table  string
+	column string
+}
+
+type AlreadySet struct {
+	table  string
+	column string
+}
+
 type ContextCanceled struct{}
+
+func getColumn(pgErr *pgconn.PgError) string {
+	columnRe := regexp.MustCompile(fmt.Sprintf("%s_([a-z_]+)_(?:[a-z]+)", pgErr.TableName))
+	column := columnRe.FindStringSubmatch(pgErr.ConstraintName)[1]
+	return cases.Title(language.English).String(column)
+}
 
 func ErrorAsStruct(err error) interface{} {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
 		switch pgErr.Code {
 		case uniqueViolation:
-			columnRe := regexp.MustCompile(fmt.Sprintf("%s_([a-z]+)_key", pgErr.TableName))
-			column := columnRe.FindStringSubmatch(pgErr.ConstraintName)[1]
-			column = cases.Title(language.English).String(column)
 			return UniqueViolation{
 				table:  pgErr.TableName,
-				column: column,
+				column: getColumn(pgErr),
 			}
 		case invalidTextRepresentation:
 			return InvalidUUID{}
+		case outOfLimits:
+			return OutOfLimits{
+				table:  pgErr.TableName,
+				column: getColumn(pgErr),
+			}
+		case alreadySet:
+			return AlreadySet{
+				table:  pgErr.TableName,
+				column: getColumn(pgErr),
+			}
 		default:
 			panic(fmt.Sprintf("unforseen case - %s code", pgErr.Code))
 		}
@@ -71,16 +96,30 @@ func ErrorAsStruct(err error) interface{} {
 	}
 }
 
-func (u UniqueViolation) LocalizeUniqueViolation(tableStruct interface{}) error {
+func localColumn(column string, tableStruct interface{}) string {
 	reflection := reflect.TypeOf(tableStruct)
-	reflectedField, _ := reflection.FieldByName(u.column)
-	localColumn := reflectedField.Tag.Get("uaLocal")
+	reflectedField, _ := reflection.FieldByName(column)
+	return reflectedField.Tag.Get("uaLocal")
+}
+
+func (u UniqueViolation) Localize(tableStruct interface{}) error {
 	var dbErr DBError
 	dbErr.asMapLocal = make(map[string]string)
 	dbErr.asString = fmt.Sprintf("%s with given %s exists", u.table, u.column)
 	dbErr.asMapLocal[u.column+"Err"] = fmt.Sprintf(
 		"Елемент з даним %s уже існує",
-		localColumn,
+		localColumn(u.column, tableStruct),
+	)
+	return dbErr
+}
+
+func (o OutOfLimits) Localize(tableStruct interface{}) error {
+	var dbErr DBError
+	dbErr.asMapLocal = make(map[string]string)
+	dbErr.asString = fmt.Sprintf("%s out of limits for %s", o.column, o.table)
+	dbErr.asMapLocal[o.column+"Err"] = fmt.Sprintf(
+		"%s поза межами",
+		localColumn(o.column, tableStruct),
 	)
 	return dbErr
 }
