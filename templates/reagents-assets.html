@@ -45,7 +45,7 @@
   <div class="flex justify-between bg-gray-light">
     <div class="flex w-1/6">
       {{if eq .Caller.Role.Name "assistant"}}
-        <button onClick="window.location.href='/reagent-new';" class="bg-gray-light hover:bg-gray hover:text-white text-xl font-serif font-bold w-full py-4 rounded">
+        <button onClick="window.location.href='/reagent-new';" class="btn-navbar-light w-full">
           Створити
         </button>
       {{end}}
@@ -91,16 +91,16 @@
       {{template "reagent-data" .}}
       {{ if eq .Caller.Role.Name "assistant" }}
         <div class="flex w-full justify-evenly">
-          <button onClick="window.location.href='/reagents/{{.ID}}/instance-new';" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold justify-center w-1/3 py-4 mt-4 rounded-md">Додати екземпляр</button>
-          <button @click="editState = ! editState" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold justify-center w-1/3 py-4 mt-4 rounded-md">Редагувати</button>
+          <button onClick="window.location.href='/reagents/{{.ID}}/instance-new';" class="btn-dark w-1/3 mt-4">Додати екземпляр</button>
+          <button @click="editState = ! editState" class="btn-dark w-1/3 mt-4">Редагувати</button>
         </div>
       {{end}}
     </div>
     <div x-show="editState">
       {{template "reagent-form" .}}
       <div class="flex w-full justify-evenly">
-        <button hx-put="/api/v1/reagents/{{.ID}}" hx-swap="outerHTML" hx-target="#reagent" hx-ext="json-enc" hx-include="[name='name'], [name='formula']" hx-headers='{"_xsrf": "{{.PutXsrf}}"}' class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold justify-center w-1/3 py-4 mt-4 rounded-md">Зберегти</button>
-        <button @click="editState = ! editState" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold justify-center w-1/3 py-4 mt-4 rounded-md">Відміна</button>
+        <button hx-put="/api/v1/reagents/{{.ID}}" hx-swap="outerHTML" hx-target="#reagent" hx-ext="json-enc" hx-include="[name='name'], [name='formula']" hx-headers='{"_xsrf": "{{.PutXsrf}}"}' class="btn-dark w-1/3 mt-4">Зберегти</button>
+        <button @click="editState = ! editState" class="btn-dark w-1/3 mt-4">Відміна</button>
       </div>
     </div>
   </div>

@@ -15,12 +15,12 @@
       <div class="grid grid-cols-2">
         {{if eq .Caller.Role.Name "assistant"}}
           <div x-show="editState" class="flex w-full justify-evenly col-span-2">
-            <button hx-post="/api/v1/reagents/{{.Reagent.ID}}/instances/{{.ID}}/transfer" hx-headers='{"_xsrf": "{{.TransferXsrf}}"}' hx-swap="outerHTML" hx-target="#instance" hx-ext="json-enc" hx-include="[name='storage'], [name='cell']" hx-on="htmx:beforeRequest: event.detail.requestConfig.parameters.storage = JSON.parse(event.detail.requestConfig.parameters.storage)['id']" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold justify-center w-1/3 py-4 mt-4 rounded-md">Зберегти</button>
-            <button @click="editState = ! editState" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold justify-center w-1/3 py-4 mt-4 rounded-md">Відміна</button>
+            <button hx-post="/api/v1/reagents/{{.Reagent.ID}}/instances/{{.ID}}/transfer" hx-headers='{"_xsrf": "{{.TransferXsrf}}"}' hx-swap="outerHTML" hx-target="#instance" hx-ext="json-enc" hx-include="[name='storage'], [name='cell']" hx-on="htmx:beforeRequest: event.detail.requestConfig.parameters.storage = JSON.parse(event.detail.requestConfig.parameters.storage)['id']" class="btn-dark w-1/3 mt-4">Зберегти</button>
+            <button @click="editState = ! editState" class="btn-dark w-1/3 mt-4">Відміна</button>
           </div>
           <div x-show="!editState" class="flex w-full justify-evenly col-span-2">
-            <button @click="editState = ! editState" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold justify-center w-1/3 py-4 mt-4 rounded-md">Перемістити</button>
-            <button x-show="!isUsed" hx-post="/api/v1/reagents/{{.Reagent.ID}}/instances/{{.ID}}/use" hx-headers='{"_xsrf": "{{.UseXsrf}}"}' hx-swap="outerHTML" hx-target="#instance" class="bg-gray-dark hover:bg-gray text-white text-xl font-serif font-bold justify-center w-1/3 py-4 mt-4 rounded-md">Використати</button>
+            <button @click="editState = ! editState" class="btn-dark w-1/3 mt-4">Перемістити</button>
+            <button x-show="!isUsed" hx-post="/api/v1/reagents/{{.Reagent.ID}}/instances/{{.ID}}/use" hx-headers='{"_xsrf": "{{.UseXsrf}}"}' hx-swap="outerHTML" hx-target="#instance" class="btn-dark w-1/3 mt-4">Використати</button>
           </div>
         {{end}}
       </div>
